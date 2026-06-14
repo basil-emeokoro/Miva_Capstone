@@ -829,8 +829,24 @@ def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> Non
             st.error("This candidate has not completed guided face enrolment.")
             return
 
-        st.caption("Capture a fresh face image. The system compares it against enrolled face templates before session start.")
-        auth_image = st.camera_input("Authentication face capture", key=f"auth_{candidate_id}")
+        st.caption("Face authentication is inactive until started. This prevents the browser from opening the camera on page load.")
+        auth_state_key = f"auth_camera_active_{candidate_id}"
+        col_start, col_stop = st.columns(2)
+        with col_start:
+            if st.button("Start face authentication", key=f"start_auth_{candidate_id}"):
+                st.session_state[auth_state_key] = True
+                st.rerun()
+        with col_stop:
+            if st.button("Stop authentication camera", key=f"stop_auth_{candidate_id}", disabled=not st.session_state.get(auth_state_key)):
+                st.session_state[auth_state_key] = False
+                st.rerun()
+
+        if not st.session_state.get(auth_state_key):
+            st.info("Camera is off. Start face authentication when the candidate is ready.")
+            auth_image = None
+        else:
+            inject_auth_overlay()
+            auth_image = st.camera_input("Authentication face capture", key=f"auth_{candidate_id}")
         if auth_image:
             try:
                 result = verify_face_against_enrolment(candidate_id, mirror_image_bytes(auth_image.getvalue()))
@@ -839,6 +855,7 @@ def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> Non
                 return
             if result["matched"]:
                 st.session_state.authenticated_candidate_id = candidate_id
+                st.session_state[auth_state_key] = False
                 st.success(f"Authenticated with confidence {result['confidence']}.")
             else:
                 st.error(f"Authentication failed. Confidence {result['confidence']}: {result['message']}")
@@ -848,7 +865,22 @@ def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> Non
                 st.caption("Prototype override for viva/demo only. It must not replace biometric authentication in production.")
                 if st.button("Authorize session start by staff override"):
                     st.session_state.authenticated_candidate_id = candidate_id
+                    st.session_state[auth_state_key] = False
                     st.warning("Staff override enabled for this candidate session.")
+
+
+def inject_auth_overlay() -> None:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stCameraInput"] {
+            --capture-guide-text: "Authentication";
+            --capture-guide-arrow: "CENTER";
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def mock_test_player() -> None:
