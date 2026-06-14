@@ -313,7 +313,7 @@ def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
             if default_candidate_id in label:
                 default_index = index
                 break
-    selected = st.selectbox("Select candidate profile", labels, index=default_index)
+    selected = st.selectbox("Select candidate profile", labels, index=default_index, key="enrolment_profile_select")
     candidate_id = selected.split("(")[-1].rstrip(")")
     render_candidate_profile(candidate_id)
 
@@ -338,7 +338,7 @@ def candidate_profiles_page(role: str) -> None:
         return
 
     labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in visible_candidates]
-    selected = st.selectbox("Candidate", labels)
+    selected = st.selectbox("Candidate", labels, key=f"candidate_profiles_select_{role}")
     candidate_id = selected.split("(")[-1].rstrip(")")
     render_candidate_profile(candidate_id, include_images=role == Role.ADMIN.value)
 
@@ -388,8 +388,27 @@ def registration_wizard(role: str) -> None:
                     key=f"custom_scope_{index}",
                 )
 
+    institution_type = st.selectbox(
+        "Institution profile",
+        ["Miva", "WAEC", "Generic"],
+        key="registration_institution_type",
+    )
+    st.caption("Changing this selection immediately filters the registration fields below.")
+
+    country_index = COUNTRIES.index("Nigeria") if "Nigeria" in COUNTRIES else 0
+    country = st.selectbox("Country", COUNTRIES, index=country_index, key="registration_country")
+    if country == "Nigeria":
+        state = st.selectbox("State / FCT", NIGERIA_STATES, key="registration_state")
+        local_government_area = st.selectbox(
+            "Local Government Area",
+            NIGERIA_LGAS.get(state, []),
+            key=f"registration_lga_{state}",
+        )
+    else:
+        state = st.text_input("State / Province / Region", key="registration_foreign_state")
+        local_government_area = st.text_input("City / Locality", key="registration_foreign_city")
+
     with st.form("candidate_form"):
-        institution_type = st.selectbox("Institution profile", ["Miva", "WAEC", "Generic"])
         full_name = st.text_input("Full name", "Demo Candidate")
         if institution_type == "WAEC":
             institution = st.text_input("Institution", "WAEC")
@@ -401,9 +420,9 @@ def registration_wizard(role: str) -> None:
             department = ""
         elif institution_type == "Miva":
             institution = st.text_input("Institution", "Miva Open University")
-            candidate_identifier = st.text_input("Candidate ID (digits only)", "10000001")
+            candidate_identifier = st.text_input("Student ID (digits only)", "10000001")
             matric_number = st.text_input("Matric Number", "MIVA/CSC/2026/001")
-            programme = st.selectbox("Programme", ["Undergraduate", "Postgraduate"])
+            programme = st.selectbox("Programme", ["Undergraduate", "Postgraduate"], key="miva_programme")
             department = st.text_input("Department", "Computer Science")
             waec_registration_number = ""
         else:
@@ -414,23 +433,10 @@ def registration_wizard(role: str) -> None:
             programme = ""
             department = ""
         email = st.text_input("Email", "candidate@example.com")
-        gender = st.selectbox("Gender", ["Female", "Male", "Other", "Prefer not to say"])
+        gender = st.selectbox("Gender", ["Female", "Male", "Other", "Prefer not to say"], key="registration_gender")
         date_of_birth = st.date_input("Date of birth", value=None)
         st.markdown("Address")
-        col_country, col_state, col_lga = st.columns(3)
-        with col_country:
-            country_index = COUNTRIES.index("Nigeria") if "Nigeria" in COUNTRIES else 0
-            country = st.selectbox("Country", COUNTRIES, index=country_index)
-        with col_state:
-            if country == "Nigeria":
-                state = st.selectbox("State / FCT", NIGERIA_STATES)
-            else:
-                state = st.text_input("State / Province / Region", "")
-        with col_lga:
-            if country == "Nigeria":
-                local_government_area = st.selectbox("Local Government Area", NIGERIA_LGAS.get(state, []))
-            else:
-                local_government_area = st.text_input("City / Locality", "")
+        st.info(f"Country: {country} | Region: {state} | Locality: {local_government_area}")
         postal_code = st.text_input("ZIP / Postal code", "")
         street_address = st.text_area("Street address", "")
         custom_values: dict[str, str] = {}
@@ -513,7 +519,7 @@ def guided_face_enrolment() -> None:
             if str(default_candidate_id) in label:
                 default_index = index
                 break
-    selected = st.selectbox("Candidate for face capture", labels, index=default_index)
+    selected = st.selectbox("Candidate for face capture", labels, index=default_index, key="face_capture_candidate_select")
     candidate = candidate_options[selected]
     candidate_id = str(candidate["candidate_id"])
     done = captured_directions(candidate_id)
@@ -683,13 +689,13 @@ def session_control(role: str) -> str | None:
         return None
 
     candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
-    selected = st.selectbox("Candidate", list(candidate_options))
+    selected = st.selectbox("Candidate", list(candidate_options), key="session_candidate_select")
     candidate = candidate_options[selected]
     candidate_id = str(candidate["candidate_id"])
     candidate_profile_summary(candidate_id)
     authenticate_candidate_panel(role, candidate)
 
-    mode = st.selectbox("Monitoring mode", ["B", "A", "C"])
+    mode = st.selectbox("Monitoring mode", ["B", "A", "C"], key="session_monitoring_mode")
     plan = MonitoringModeController().configure(mode)
     st.caption(plan.confidence_note)
 
@@ -706,7 +712,7 @@ def session_control(role: str) -> str | None:
     sessions = list_sessions()
     if sessions:
         session_labels = [f"{s['session_id']} - {s['candidate_id']} - {s['session_status']}" for s in sessions]
-        chosen = st.selectbox("Active/reporting session", session_labels)
+        chosen = st.selectbox("Active/reporting session", session_labels, key="active_reporting_session")
         session_id = chosen.split(" - ")[0]
         st.session_state.active_session_id = session_id
         st.session_state.active_candidate_id = next(s["candidate_id"] for s in sessions if s["session_id"] == session_id)
@@ -729,10 +735,11 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False) ->
     samples = list_face_samples(candidate_id)
     custom_fields = list_candidate_custom_fields(candidate_id)
     captured = captured_directions(candidate_id)
+    id_label = "Student ID" if candidate.get("institution_type") == "Miva" else "Candidate ID"
     st.markdown(
         f"""
         <div class="profile-grid">
-            <div class="profile-card"><span>Candidate ID</span><strong>{candidate_id}</strong></div>
+            <div class="profile-card"><span>{id_label}</span><strong>{candidate_id}</strong></div>
             <div class="profile-card"><span>Full name</span><strong>{candidate['full_name']}</strong></div>
             <div class="profile-card"><span>Institution</span><strong>{candidate['institution']}</strong></div>
             <div class="profile-card"><span>Enrolment status</span><strong>{candidate['enrolment_status']}</strong></div>
@@ -832,7 +839,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     if has_permission(role, "generate_demo_events"):
         col1, col2 = st.columns(2)
         with col1:
-            preset = st.selectbox("Visual/identity event", list(VISUAL_EVENT_PRESETS))
+            preset = st.selectbox("Visual/identity event", list(VISUAL_EVENT_PRESETS), key="monitoring_visual_event")
             if st.button("Generate selected event"):
                 event = create_demo_visual_event(session_id, candidate_id, preset)
                 save_event(event)
@@ -870,8 +877,8 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
     st.dataframe(pd.DataFrame(alerts), use_container_width=True)
     if has_permission(role, "review_alerts"):
         alert_ids = [str(alert["alert_id"]) for alert in alerts]
-        alert_id = st.selectbox("Alert to review", alert_ids)
-        decision = st.selectbox("Decision", ["accepted", "rejected", "escalated"])
+        alert_id = st.selectbox("Alert to review", alert_ids, key="review_alert_select")
+        decision = st.selectbox("Decision", ["accepted", "rejected", "escalated"], key="review_decision_select")
         comment = st.text_area("Reviewer comment")
         if st.button("Submit reviewer decision"):
             record_review(alert_id, role, decision, comment)

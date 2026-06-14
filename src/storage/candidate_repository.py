@@ -72,7 +72,7 @@ def normalize_candidate_id(candidate_id: str, institution_type: str) -> str:
         return value
     if institution_type == "Miva":
         if not re.fullmatch(r"\d+", value):
-            raise ValueError("Miva Candidate ID must contain digits only.")
+            raise ValueError("Miva Student ID must contain digits only.")
         return value
     return value
 
