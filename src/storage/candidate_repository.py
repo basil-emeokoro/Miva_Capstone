@@ -1,22 +1,78 @@
 from __future__ import annotations
 
+import re
 from uuid import uuid4
 
 from src.storage.database import get_connection
 from src.utils.time_utils import utc_now_iso
 
 
-def register_candidate(full_name: str, exam_code: str, institution: str, email: str) -> str:
-    candidate_id = f"CAND-{uuid4().hex[:8].upper()}"
+def register_candidate(
+    full_name: str,
+    candidate_id: str,
+    institution: str,
+    email: str,
+    institution_type: str = "Generic",
+    waec_registration_number: str | None = None,
+    matric_number: str | None = None,
+    gender: str | None = None,
+    date_of_birth: str | None = None,
+    country: str | None = None,
+    state: str | None = None,
+    local_government_area: str | None = None,
+    street_address: str | None = None,
+) -> str:
+    resolved_candidate_id = normalize_candidate_id(candidate_id, institution_type)
+    centre_number = resolved_candidate_id[:7] if institution_type == "WAEC" else None
+    candidate_number = resolved_candidate_id[-3:] if institution_type == "WAEC" else None
     with get_connection() as connection:
         connection.execute(
             """
-            INSERT INTO candidates(candidate_id, full_name, exam_code, institution, email, enrolment_status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO candidates(
+                candidate_id, full_name, exam_code, institution, email, institution_type,
+                waec_registration_number, centre_number, candidate_number, matric_number,
+                gender, date_of_birth, country, state, local_government_area, street_address,
+                enrolment_status, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (candidate_id, full_name, exam_code, institution, email, "registered", utc_now_iso()),
+            (
+                resolved_candidate_id,
+                full_name,
+                resolved_candidate_id,
+                institution,
+                email,
+                institution_type,
+                waec_registration_number,
+                centre_number,
+                candidate_number,
+                matric_number,
+                gender,
+                date_of_birth,
+                country,
+                state,
+                local_government_area,
+                street_address,
+                "registered",
+                utc_now_iso(),
+            ),
         )
-    return candidate_id
+    return resolved_candidate_id
+
+
+def normalize_candidate_id(candidate_id: str, institution_type: str) -> str:
+    value = candidate_id.strip().upper()
+    if not value:
+        raise ValueError("Candidate ID is required.")
+    if institution_type == "WAEC":
+        if not re.fullmatch(r"\d{10}", value):
+            raise ValueError("WAEC Candidate ID must be exactly 10 digits.")
+        return value
+    if institution_type == "Miva":
+        if not re.fullmatch(r"\d+", value):
+            raise ValueError("Miva Candidate ID must contain digits only.")
+        return value
+    return value
 
 
 def save_candidate_custom_fields(candidate_id: str, fields: dict[str, str]) -> None:

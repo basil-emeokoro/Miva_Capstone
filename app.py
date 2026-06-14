@@ -296,26 +296,42 @@ def candidate_management(role: str) -> None:
         guided_face_enrolment()
     else:
         profile_candidate_id = st.session_state.get("profile_candidate_id") or st.session_state.get("enrolment_candidate_id")
-        if profile_candidate_id:
-            render_candidate_profile(str(profile_candidate_id))
-        else:
-            st.info("Select an enrolled candidate from the session page.")
+        candidate_profile_browser(str(profile_candidate_id) if profile_candidate_id else None)
+
+
+def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
+    candidates = list_candidates()
+    st.markdown("#### Enrolled candidates")
+    if not candidates:
+        st.info("No enrolled candidates are available yet.")
+        return
+    labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in candidates]
+    default_index = 0
+    if default_candidate_id:
+        for index, label in enumerate(labels):
+            if default_candidate_id in label:
+                default_index = index
+                break
+    selected = st.selectbox("Select candidate profile", labels, index=default_index)
+    candidate_id = selected.split("(")[-1].rstrip(")")
+    render_candidate_profile(candidate_id)
 
 
 def render_enrolment_steps() -> None:
-    register_state = "active" if st.session_state.enrolment_step == "register" else ""
-    face_state = "active" if st.session_state.enrolment_step == "face" else ""
-    profile_state = "active" if st.session_state.enrolment_step == "profile" else ""
-    st.markdown(
-        f"""
-        <div>
-            <span class="wizard-step {register_state}">1. Registration + Consent</span>
-            <span class="wizard-step {face_state}">2. Guided Face Capture</span>
-            <span class="wizard-step {profile_state}">3. Candidate Profile</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    col_register, col_face, col_profile = st.columns(3)
+    with col_register:
+        if st.button("1. Registration + Consent", type="primary" if st.session_state.enrolment_step == "register" else "secondary"):
+            st.session_state.enrolment_step = "register"
+            st.rerun()
+    with col_face:
+        disabled = not st.session_state.get("enrolment_candidate_id")
+        if st.button("2. Guided Face Capture", disabled=disabled, type="primary" if st.session_state.enrolment_step == "face" else "secondary"):
+            st.session_state.enrolment_step = "face"
+            st.rerun()
+    with col_profile:
+        if st.button("3. Candidate Profile", type="primary" if st.session_state.enrolment_step == "profile" else "secondary"):
+            st.session_state.enrolment_step = "profile"
+            st.rerun()
 
 
 def registration_wizard(role: str) -> None:
@@ -331,10 +347,36 @@ def registration_wizard(role: str) -> None:
             field["label"] = st.text_input(f"Field {index + 1} label", field["label"], key=f"custom_label_{index}")
 
     with st.form("candidate_form"):
+        institution_type = st.selectbox("Institution profile", ["Miva", "WAEC", "Generic"])
         full_name = st.text_input("Full name", "Demo Candidate")
-        exam_code = st.text_input("Exam code", "MIVA-CAPSTONE-001")
-        institution = st.text_input("Institution", "Miva Open University")
+        if institution_type == "WAEC":
+            institution = st.text_input("Institution", "WAEC")
+            candidate_identifier = st.text_input("Candidate ID (10 digits)", "1234567001")
+            st.caption("WAEC Candidate ID = 7-digit centre number + 3-digit candidate number.")
+            waec_registration_number = st.text_input("Candidate Registration Number", "WAEC/REG/2026-A1")
+            matric_number = ""
+        elif institution_type == "Miva":
+            institution = st.text_input("Institution", "Miva Open University")
+            candidate_identifier = st.text_input("Candidate ID (digits only)", "10000001")
+            matric_number = st.text_input("Matric Number", "MIVA/CSC/2026/001")
+            waec_registration_number = ""
+        else:
+            institution = st.text_input("Institution", "Demo Institution")
+            candidate_identifier = st.text_input("Candidate ID", "CAND-DEMO-001")
+            waec_registration_number = ""
+            matric_number = ""
         email = st.text_input("Email", "candidate@example.com")
+        gender = st.selectbox("Gender", ["Female", "Male", "Other", "Prefer not to say"])
+        date_of_birth = st.date_input("Date of birth", value=None)
+        st.markdown("Address")
+        col_country, col_state, col_lga = st.columns(3)
+        with col_country:
+            country = st.text_input("Country", "Nigeria")
+        with col_state:
+            state = st.text_input("State", "")
+        with col_lga:
+            local_government_area = st.text_input("Local Government Area", "")
+        street_address = st.text_area("Street address", "")
         custom_values: dict[str, str] = {}
         for index, field in enumerate(st.session_state.custom_fields):
             label = field["label"].strip()
@@ -347,7 +389,25 @@ def registration_wizard(role: str) -> None:
         if not consent:
             st.error("Consent is required before enrolment.")
             return
-        candidate_id = register_candidate(full_name, exam_code, institution, email)
+        try:
+            candidate_id = register_candidate(
+                full_name=full_name,
+                candidate_id=candidate_identifier,
+                institution=institution,
+                email=email,
+                institution_type=institution_type,
+                waec_registration_number=waec_registration_number or None,
+                matric_number=matric_number or None,
+                gender=gender,
+                date_of_birth=date_of_birth.isoformat() if date_of_birth else None,
+                country=country,
+                state=state,
+                local_government_area=local_government_area,
+                street_address=street_address,
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+            return
         save_candidate_custom_fields(candidate_id, custom_values)
         capture_consent(candidate_id)
         st.session_state.enrolment_candidate_id = candidate_id
@@ -561,7 +621,7 @@ def session_control(role: str) -> str | None:
         st.warning("Authenticate this enrolled candidate before starting a session.")
 
     if has_permission(role, "start_session") and st.button("Start prototype session", disabled=not authenticated):
-        session_id = start_session(candidate_id, str(candidate["exam_code"]), mode)
+        session_id = start_session(candidate_id, candidate_id, mode)
         st.session_state.active_session_id = session_id
         st.session_state.active_candidate_id = candidate_id
         st.success(f"Started session {session_id}")
@@ -597,12 +657,29 @@ def render_candidate_profile(candidate_id: str) -> None:
         <div class="profile-grid">
             <div class="profile-card"><span>Candidate ID</span><strong>{candidate_id}</strong></div>
             <div class="profile-card"><span>Full name</span><strong>{candidate['full_name']}</strong></div>
-            <div class="profile-card"><span>Exam code</span><strong>{candidate['exam_code']}</strong></div>
+            <div class="profile-card"><span>Institution</span><strong>{candidate['institution']}</strong></div>
             <div class="profile-card"><span>Enrolment status</span><strong>{candidate['enrolment_status']}</strong></div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+    identifier_rows = [
+        {"field": "Institution profile", "value": candidate.get("institution_type")},
+        {"field": "WAEC Registration Number", "value": candidate.get("waec_registration_number")},
+        {"field": "WAEC Centre Number", "value": candidate.get("centre_number")},
+        {"field": "WAEC Candidate Number", "value": candidate.get("candidate_number")},
+        {"field": "Miva Matric Number", "value": candidate.get("matric_number")},
+        {"field": "Gender", "value": candidate.get("gender")},
+        {"field": "Date of Birth", "value": candidate.get("date_of_birth")},
+        {"field": "Country", "value": candidate.get("country")},
+        {"field": "State", "value": candidate.get("state")},
+        {"field": "Local Government Area", "value": candidate.get("local_government_area")},
+        {"field": "Street Address", "value": candidate.get("street_address")},
+    ]
+    visible_identifier_rows = [row for row in identifier_rows if row["value"]]
+    if visible_identifier_rows:
+        st.write("Institutional and demographic details")
+        st.dataframe(pd.DataFrame(visible_identifier_rows), use_container_width=True)
     st.progress(len(captured) / len(FACE_DIRECTIONS), text=f"{len(captured)} of {len(FACE_DIRECTIONS)} required face samples captured")
     if custom_fields:
         st.write("Custom fields")

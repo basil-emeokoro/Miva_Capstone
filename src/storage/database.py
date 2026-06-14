@@ -14,6 +14,17 @@ CREATE TABLE IF NOT EXISTS candidates (
     exam_code TEXT NOT NULL,
     institution TEXT NOT NULL,
     email TEXT NOT NULL,
+    institution_type TEXT DEFAULT 'Generic',
+    waec_registration_number TEXT,
+    centre_number TEXT,
+    candidate_number TEXT,
+    matric_number TEXT,
+    gender TEXT,
+    date_of_birth TEXT,
+    country TEXT,
+    state TEXT,
+    local_government_area TEXT,
+    street_address TEXT,
     enrolment_status TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -135,8 +146,29 @@ def get_connection(path: str | Path | None = None) -> sqlite3.Connection:
 def initialize_database(path: str | Path | None = None) -> None:
     with get_connection(path) as connection:
         connection.executescript(SCHEMA)
+        _ensure_candidate_columns(connection)
 
 
 def fetch_all(query: str, params: Iterable[object] = ()) -> list[sqlite3.Row]:
     with get_connection() as connection:
         return list(connection.execute(query, tuple(params)))
+
+
+def _ensure_candidate_columns(connection: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in connection.execute("PRAGMA table_info(candidates)").fetchall()}
+    required_columns = {
+        "institution_type": "TEXT DEFAULT 'Generic'",
+        "waec_registration_number": "TEXT",
+        "centre_number": "TEXT",
+        "candidate_number": "TEXT",
+        "matric_number": "TEXT",
+        "gender": "TEXT",
+        "date_of_birth": "TEXT",
+        "country": "TEXT",
+        "state": "TEXT",
+        "local_government_area": "TEXT",
+        "street_address": "TEXT",
+    }
+    for column, definition in required_columns.items():
+        if column not in existing:
+            connection.execute(f"ALTER TABLE candidates ADD COLUMN {column} {definition}")
