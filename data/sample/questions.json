@@ -1,0 +1,20 @@
+[
+  {
+    "question_id": "Q1",
+    "prompt": "Which module is responsible for combining events from camera, audio, identity, and behaviour modules?",
+    "options": ["Event Fusion Engine", "Voice Enrolment Module", "Camera Discovery Module", "Report Exporter"],
+    "answer": "Event Fusion Engine"
+  },
+  {
+    "question_id": "Q2",
+    "prompt": "Who makes the final misconduct decision in the prototype?",
+    "options": ["Human Reviewer", "YOLO Model", "Audio Detector", "Liveness Checker"],
+    "answer": "Human Reviewer"
+  },
+  {
+    "question_id": "Q3",
+    "prompt": "Which monitoring mode is the recommended full remote-proctoring mode?",
+    "options": ["Mode A", "Mode B", "Mode C", "Offline Mode"],
+    "answer": "Mode B"
+  }
+]

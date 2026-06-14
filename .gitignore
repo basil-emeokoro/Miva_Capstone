@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+System Specification.pdf
+docs/implementation_addendum.md
+data/proctoring.db
+data/enrolment/*
+!data/enrolment/.gitkeep
+data/evidence/*
+!data/evidence/.gitkeep
+logs/*.log
+logs/*.csv
+outputs/screenshots/*
+outputs/clips/*
+outputs/reports/*
+outputs/exports/*
+!outputs/screenshots/.gitkeep
+!outputs/clips/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/exports/.gitkeep
