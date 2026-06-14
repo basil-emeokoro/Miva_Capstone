@@ -12,8 +12,10 @@ from src.enrolment.face_enrolment import (
     FACE_DIRECTIONS,
     captured_directions,
     is_face_enrolment_complete,
+    list_face_samples,
     record_face_sample,
 )
+from src.authentication.face_verifier import verify_face_against_enrolment
 from src.fusion.fusion_engine import FusionEngine
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
@@ -21,7 +23,12 @@ from src.security.access_control import Role, has_permission
 from src.session.exam_controller import grade_answers, load_sample_questions
 from src.session.monitoring_mode_controller import MonitoringModeController
 from src.session.session_manager import list_sessions, start_session
-from src.storage.candidate_repository import list_candidates, register_candidate, save_candidate_custom_fields
+from src.storage.candidate_repository import (
+    list_candidate_custom_fields,
+    list_candidates,
+    register_candidate,
+    save_candidate_custom_fields,
+)
 from src.storage.database import initialize_database
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
@@ -150,6 +157,28 @@ def apply_theme() -> None:
             border: 1px solid #b9e4de;
             margin: .65rem 0;
         }
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(140px, 1fr));
+            gap: .75rem;
+            margin: .85rem 0;
+        }
+        .profile-card {
+            background: #ffffff;
+            border: 1px solid #d7e2eb;
+            border-radius: 8px;
+            padding: .85rem;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        }
+        .profile-card span {
+            display: block;
+            color: #64748b;
+            font-size: .8rem;
+            margin-bottom: .25rem;
+        }
+        .profile-card strong {
+            color: #0f172a;
+        }
         .stCameraInput video,
         .stCameraInput img {
             cursor: crosshair !important;
@@ -263,18 +292,26 @@ def candidate_management(role: str) -> None:
     render_enrolment_steps()
     if st.session_state.enrolment_step == "register":
         registration_wizard(role)
-    else:
+    elif st.session_state.enrolment_step == "face":
         guided_face_enrolment()
+    else:
+        profile_candidate_id = st.session_state.get("profile_candidate_id") or st.session_state.get("enrolment_candidate_id")
+        if profile_candidate_id:
+            render_candidate_profile(str(profile_candidate_id))
+        else:
+            st.info("Select an enrolled candidate from the session page.")
 
 
 def render_enrolment_steps() -> None:
     register_state = "active" if st.session_state.enrolment_step == "register" else ""
     face_state = "active" if st.session_state.enrolment_step == "face" else ""
+    profile_state = "active" if st.session_state.enrolment_step == "profile" else ""
     st.markdown(
         f"""
         <div>
             <span class="wizard-step {register_state}">1. Registration + Consent</span>
             <span class="wizard-step {face_state}">2. Guided Face Capture</span>
+            <span class="wizard-step {profile_state}">3. Candidate Profile</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -349,13 +386,18 @@ def guided_face_enrolment() -> None:
     remaining = [direction for direction in FACE_DIRECTIONS if direction not in done]
     if not remaining:
         st.success("Guided facial enrolment is complete for this candidate.")
-        col_a, col_b = st.columns(2)
+        col_a, col_b, col_c = st.columns(3)
         with col_a:
+            if st.button("View enrolled candidate"):
+                st.session_state.profile_candidate_id = candidate_id
+                st.session_state.enrolment_step = "profile"
+                st.rerun()
+        with col_b:
             if st.button("Register another candidate"):
                 st.session_state.enrolment_step = "register"
                 st.session_state.pop("enrolment_candidate_id", None)
                 st.rerun()
-        with col_b:
+        with col_c:
             st.caption("Next workflow: authenticate candidate and start session monitoring.")
         return
 
@@ -498,6 +540,7 @@ def inject_capture_overlay(direction: str) -> None:
 def session_control(role: str) -> str | None:
     candidates = list_candidates()
     st.subheader("Session Control")
+    st.caption("Staff RBAC controls Admin, Human Proctor, and Reviewer access. Candidates are not RBAC users; they authenticate separately through their enrolment profile.")
     if not candidates:
         st.warning("Register a candidate before starting a session.")
         return None
@@ -505,14 +548,22 @@ def session_control(role: str) -> str | None:
     candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
     selected = st.selectbox("Candidate", list(candidate_options))
     candidate = candidate_options[selected]
+    candidate_id = str(candidate["candidate_id"])
+    candidate_profile_summary(candidate_id)
+    authenticate_candidate_panel(role, candidate)
+
     mode = st.selectbox("Monitoring mode", ["B", "A", "C"])
     plan = MonitoringModeController().configure(mode)
     st.caption(plan.confidence_note)
 
-    if has_permission(role, "start_session") and st.button("Start prototype session"):
-        session_id = start_session(str(candidate["candidate_id"]), str(candidate["exam_code"]), mode)
+    authenticated = st.session_state.get("authenticated_candidate_id") == candidate_id
+    if not authenticated:
+        st.warning("Authenticate this enrolled candidate before starting a session.")
+
+    if has_permission(role, "start_session") and st.button("Start prototype session", disabled=not authenticated):
+        session_id = start_session(candidate_id, str(candidate["exam_code"]), mode)
         st.session_state.active_session_id = session_id
-        st.session_state.active_candidate_id = candidate["candidate_id"]
+        st.session_state.active_candidate_id = candidate_id
         st.success(f"Started session {session_id}")
 
     sessions = list_sessions()
@@ -524,6 +575,71 @@ def session_control(role: str) -> str | None:
         st.session_state.active_candidate_id = next(s["candidate_id"] for s in sessions if s["session_id"] == session_id)
         return session_id
     return None
+
+
+def candidate_profile_summary(candidate_id: str) -> None:
+    with st.expander("View enrolled candidate profile", expanded=False):
+        render_candidate_profile(candidate_id)
+
+
+def render_candidate_profile(candidate_id: str) -> None:
+    candidates = {str(candidate["candidate_id"]): candidate for candidate in list_candidates()}
+    candidate = candidates.get(candidate_id)
+    if not candidate:
+        st.info("Candidate profile not found.")
+        return
+
+    samples = list_face_samples(candidate_id)
+    custom_fields = list_candidate_custom_fields(candidate_id)
+    captured = captured_directions(candidate_id)
+    st.markdown(
+        f"""
+        <div class="profile-grid">
+            <div class="profile-card"><span>Candidate ID</span><strong>{candidate_id}</strong></div>
+            <div class="profile-card"><span>Full name</span><strong>{candidate['full_name']}</strong></div>
+            <div class="profile-card"><span>Exam code</span><strong>{candidate['exam_code']}</strong></div>
+            <div class="profile-card"><span>Enrolment status</span><strong>{candidate['enrolment_status']}</strong></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.progress(len(captured) / len(FACE_DIRECTIONS), text=f"{len(captured)} of {len(FACE_DIRECTIONS)} required face samples captured")
+    if custom_fields:
+        st.write("Custom fields")
+        st.dataframe(pd.DataFrame(custom_fields)[["field_name", "field_value"]], use_container_width=True)
+    if samples:
+        st.write("Face enrolment records")
+        visible_columns = ["capture_direction", "quality_score", "image_path", "embedding_path", "captured_at"]
+        st.dataframe(pd.DataFrame(samples)[visible_columns], use_container_width=True)
+
+
+def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> None:
+    candidate_id = str(candidate["candidate_id"])
+    with st.expander("Candidate authentication", expanded=True):
+        if candidate.get("enrolment_status") != "face_enrolled":
+            st.error("This candidate has not completed guided face enrolment.")
+            return
+
+        st.caption("Capture a fresh face image. The system compares it against enrolled face templates before session start.")
+        auth_image = st.camera_input("Authentication face capture", key=f"auth_{candidate_id}")
+        if auth_image:
+            try:
+                result = verify_face_against_enrolment(candidate_id, mirror_image_bytes(auth_image.getvalue()))
+            except ValueError as exc:
+                st.error(str(exc))
+                return
+            if result["matched"]:
+                st.session_state.authenticated_candidate_id = candidate_id
+                st.success(f"Authenticated with confidence {result['confidence']}.")
+            else:
+                st.error(f"Authentication failed. Confidence {result['confidence']}: {result['message']}")
+
+        if has_permission(role, "start_session"):
+            with st.expander("Staff override"):
+                st.caption("Prototype override for viva/demo only. It must not replace biometric authentication in production.")
+                if st.button("Authorize session start by staff override"):
+                    st.session_state.authenticated_candidate_id = candidate_id
+                    st.warning("Staff override enabled for this candidate session.")
 
 
 def mock_test_player() -> None:
