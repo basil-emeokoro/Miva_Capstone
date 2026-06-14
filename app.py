@@ -5,7 +5,12 @@ import streamlit as st
 
 from src.audio.audio_event_detector import create_background_speech_event
 from src.enrolment.consent_manager import CONSENT_NOTICE, capture_consent
-from src.enrolment.face_enrolment import complete_prototype_face_enrolment
+from src.enrolment.face_enrolment import (
+    FACE_DIRECTIONS,
+    captured_directions,
+    is_face_enrolment_complete,
+    record_face_sample,
+)
 from src.fusion.fusion_engine import FusionEngine
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
@@ -16,6 +21,7 @@ from src.session.session_manager import list_sessions, start_session
 from src.storage.candidate_repository import list_candidates, register_candidate
 from src.storage.database import initialize_database
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
+from src.utils.file_utils import candidate_enrolment_dir, write_bytes
 from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
 
 
@@ -24,6 +30,96 @@ initialize_database()
 
 if "fusion_engine" not in st.session_state:
     st.session_state.fusion_engine = FusionEngine()
+
+
+def apply_theme() -> None:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: linear-gradient(180deg, #f3f7fb 0%, #eef4f8 42%, #ffffff 100%);
+        }
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #e8eef5 0%, #f7fafc 100%);
+            border-right: 1px solid #d6e0ea;
+        }
+        .hero {
+            background: linear-gradient(135deg, #063b5c 0%, #075a75 52%, #0a7f78 100%);
+            color: white;
+            padding: 2.1rem 2.3rem;
+            border-radius: 0 0 22px 22px;
+            margin-bottom: 1.4rem;
+            box-shadow: 0 18px 42px rgba(6, 59, 92, 0.18);
+        }
+        .hero h1 {
+            margin: 0 0 .45rem 0;
+            font-size: 2.2rem;
+            letter-spacing: 0;
+        }
+        .hero p {
+            margin: 0;
+            color: #d7edf5;
+            font-size: 1rem;
+        }
+        .notice {
+            background: #fff8dc;
+            color: #805700;
+            border-left: 5px solid #f5b400;
+            padding: 1rem 1.1rem;
+            border-radius: 8px;
+            margin-bottom: 1.2rem;
+        }
+        .status-card {
+            background: #ffffff;
+            border: 1px solid #d7e2eb;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+        div[data-testid="stButton"] button,
+        div[data-baseweb="select"],
+        label[data-testid="stWidgetLabel"],
+        input,
+        textarea,
+        .stTabs [role="tab"] {
+            cursor: pointer !important;
+        }
+        div[data-testid="stButton"] button {
+            border-radius: 8px;
+            border: 1px solid #0b6b7a;
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+        }
+        div[data-testid="stButton"] button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(7, 90, 117, 0.18);
+            border-color: #0a7f78;
+        }
+        div[data-baseweb="select"] > div:hover {
+            border-color: #0a7f78 !important;
+            box-shadow: 0 0 0 1px rgba(10, 127, 120, .15);
+        }
+        .stTabs [role="tab"]:hover {
+            color: #0a7f78;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_hero() -> None:
+    st.markdown(
+        """
+        <div class="hero">
+            <h1>Secure Remote-Proctored Assessment Console</h1>
+            <p>Explainable multi-modal monitoring, identity assurance, event fusion, and human-supervised review.</p>
+        </div>
+        <div class="notice">
+            Research prototype for academic demonstration. AI-generated alerts support human review and must not be treated as automatic misconduct decisions.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def selected_role() -> str:
@@ -40,13 +136,14 @@ def candidate_management(role: str) -> None:
         st.info("Your role can view monitoring data but cannot register candidates.")
         return
 
+    st.markdown("#### 1. Register candidate and capture consent")
     with st.form("candidate_form"):
         full_name = st.text_input("Full name", "Demo Candidate")
         exam_code = st.text_input("Exam code", "MIVA-CAPSTONE-001")
         institution = st.text_input("Institution", "Miva Open University")
         email = st.text_input("Email", "candidate@example.com")
         consent = st.checkbox(CONSENT_NOTICE)
-        submitted = st.form_submit_button("Register and enrol prototype candidate")
+        submitted = st.form_submit_button("Register candidate")
 
     if submitted:
         if not consent:
@@ -54,8 +151,59 @@ def candidate_management(role: str) -> None:
             return
         candidate_id = register_candidate(full_name, exam_code, institution, email)
         capture_consent(candidate_id)
-        complete_prototype_face_enrolment(candidate_id)
-        st.success(f"Candidate registered and prototype face enrolment completed: {candidate_id}")
+        st.session_state.enrolment_candidate_id = candidate_id
+        st.success(f"Candidate registered: {candidate_id}. Continue to guided face capture below.")
+
+    guided_face_enrolment()
+
+
+def guided_face_enrolment() -> None:
+    candidates = list_candidates()
+    st.markdown("#### 2. Guided facial enrolment")
+    st.caption("Use the browser camera capture for each required direction. This creates real image evidence records for the prototype.")
+    if not candidates:
+        st.info("No registered candidates yet.")
+        return
+
+    candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
+    default_candidate_id = st.session_state.get("enrolment_candidate_id")
+    labels = list(candidate_options)
+    default_index = 0
+    if default_candidate_id:
+        for index, label in enumerate(labels):
+            if str(default_candidate_id) in label:
+                default_index = index
+                break
+    selected = st.selectbox("Candidate for face capture", labels, index=default_index)
+    candidate = candidate_options[selected]
+    candidate_id = str(candidate["candidate_id"])
+    done = captured_directions(candidate_id)
+    progress = len(done) / len(FACE_DIRECTIONS)
+    st.progress(progress, text=f"{len(done)} of {len(FACE_DIRECTIONS)} directions captured")
+
+    cols = st.columns(len(FACE_DIRECTIONS))
+    for index, direction in enumerate(FACE_DIRECTIONS):
+        with cols[index]:
+            status = "Captured" if direction in done else "Pending"
+            st.metric(direction.replace("_", " ").title(), status)
+
+    remaining = [direction for direction in FACE_DIRECTIONS if direction not in done]
+    direction = st.selectbox("Capture direction", remaining or FACE_DIRECTIONS)
+    st.info(f"Position face for: {direction.replace('_', ' ').title()}")
+    image = st.camera_input("Activate camera and capture face sample", key=f"camera_{candidate_id}_{direction}")
+
+    if image and st.button("Save captured face sample"):
+        file_path = candidate_enrolment_dir(candidate_id) / f"{direction}.jpg"
+        write_bytes(file_path, image.getvalue())
+        record_face_sample(candidate_id, direction, str(file_path), quality_score=0.85)
+        if is_face_enrolment_complete(candidate_id):
+            from src.storage.candidate_repository import update_enrolment_status
+
+            update_enrolment_status(candidate_id, "face_enrolled")
+            st.success("Guided facial enrolment completed for all required directions.")
+        else:
+            st.success(f"Saved {direction.replace('_', ' ')} face sample.")
+        st.rerun()
 
 
 def session_control(role: str) -> str | None:
@@ -177,9 +325,9 @@ def reports_panel(role: str, session_id: str | None) -> None:
 
 
 def main() -> None:
+    apply_theme()
     role = selected_role()
-    st.title("Explainable Multi-Modal Proctoring Prototype")
-    st.caption("Local-first capstone prototype. AI flags and explains; human reviewers decide.")
+    render_hero()
 
     tabs = st.tabs(["Enrolment", "Session", "Test Player", "Monitoring", "Review", "Reports"])
     with tabs[0]:

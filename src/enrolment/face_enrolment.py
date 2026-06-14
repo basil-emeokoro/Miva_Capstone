@@ -30,3 +30,28 @@ def complete_prototype_face_enrolment(candidate_id: str) -> list[str]:
     records = [record_face_sample(candidate_id, direction, quality_score=0.85) for direction in FACE_DIRECTIONS]
     update_enrolment_status(candidate_id, "face_enrolled")
     return records
+
+
+def list_face_samples(candidate_id: str) -> list[dict[str, object]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM face_enrolment
+            WHERE candidate_id = ?
+            ORDER BY captured_at DESC
+            """,
+            (candidate_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def captured_directions(candidate_id: str) -> set[str]:
+    return {
+        str(sample["capture_direction"])
+        for sample in list_face_samples(candidate_id)
+        if sample.get("image_path")
+    }
+
+
+def is_face_enrolment_complete(candidate_id: str) -> bool:
+    return set(FACE_DIRECTIONS).issubset(captured_directions(candidate_id))
