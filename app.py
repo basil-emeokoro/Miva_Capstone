@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import pandas as pd
 import streamlit as st
 import numpy as np
 
 from src.audio.audio_event_detector import create_background_speech_event
+from src.enrolment.auto_capture import ai_auto_capture
 from src.enrolment.consent_manager import CONSENT_NOTICE, capture_consent
 from src.enrolment.face_enrolment import (
     FACE_DIRECTIONS,
@@ -132,22 +134,43 @@ def apply_theme() -> None:
             border: 1px solid #cfe0ea;
             background: linear-gradient(180deg, #ffffff 0%, #f5fbfd 100%);
             border-radius: 8px;
-            padding: 1.2rem;
-            margin: 1rem 0;
+            padding: .85rem 1rem;
+            margin: .6rem 0 .8rem 0;
+            display: grid;
+            grid-template-columns: 88px 1fr;
+            align-items: center;
+            gap: 1rem;
         }
         .face-orb {
-            width: 190px;
-            height: 190px;
+            width: 76px;
+            height: 76px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: .6rem auto;
             background: radial-gradient(circle, #dff7f4 0%, #c7e9f2 62%, #0a7f78 64%, #063b5c 100%);
             color: #063b5c;
-            font-size: 3rem;
+            font-size: 1.25rem;
             font-weight: 800;
             box-shadow: inset 0 0 0 10px rgba(255,255,255,.65), 0 12px 30px rgba(6,59,92,.18);
+        }
+        .capture-shell {
+            background: #ffffff;
+            border: 1px solid #cfe0ea;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+        }
+        .ai-status {
+            display: flex;
+            gap: .55rem;
+            align-items: center;
+            padding: .7rem .85rem;
+            border-radius: 8px;
+            background: #e8f7f5;
+            color: #075a75;
+            border: 1px solid #b9e4de;
+            margin: .65rem 0;
         }
         .stCameraInput video,
         .stCameraInput img {
@@ -157,12 +180,21 @@ def apply_theme() -> None:
         .camera-circular .stCameraInput img,
         div[data-testid="stCameraInput"] video,
         div[data-testid="stCameraInput"] img {
+            width: 280px !important;
+            height: 280px !important;
             max-width: 280px !important;
+            max-height: 280px !important;
             border-radius: 999px !important;
             aspect-ratio: 1 / 1 !important;
             object-fit: cover !important;
             border: 4px solid #0a7f78 !important;
             box-shadow: 0 10px 30px rgba(6,59,92,.18);
+            display: block !important;
+            margin: 0 auto !important;
+        }
+        div[data-testid="stCameraInput"] {
+            max-width: 520px !important;
+            margin: 0 auto !important;
         }
         </style>
         """,
@@ -306,7 +338,24 @@ def guided_face_enrolment() -> None:
     direction = remaining[0]
     direction_label = direction.replace("_", " ").title()
     st.markdown(f"### Capture {len(done) + 1} of {len(FACE_DIRECTIONS)}: {direction_label}")
+    st.markdown('<div class="capture-shell">', unsafe_allow_html=True)
     render_capture_indicator(direction)
+    st.markdown(
+        '<div class="ai-status">AI guide: keep one face inside the circle, hold still, and improve lighting until the capture is accepted.</div>',
+        unsafe_allow_html=True,
+    )
+    ai_col, fallback_col = st.columns([1, 1])
+    with ai_col:
+        if st.button("AI auto-capture valid frame"):
+            with st.spinner("Watching webcam for a valid face frame..."):
+                result = ai_auto_capture(direction=direction)
+            if result["accepted"] and result["image_bytes"]:
+                process_face_capture(candidate_id, direction, direction_label, bytes(result["image_bytes"]))
+            else:
+                st.warning(str(result["message"]))
+    with fallback_col:
+        st.caption("Fallback: use browser camera below if local webcam auto-capture is unavailable.")
+
     frame_shape = st.radio("Camera frame", ["Circular guide", "Original rectangle"], horizontal=True, index=0)
     if frame_shape == "Original rectangle":
         st.markdown(
@@ -315,6 +364,8 @@ def guided_face_enrolment() -> None:
             div[data-testid="stCameraInput"] video,
             div[data-testid="stCameraInput"] img {
                 max-width: 100% !important;
+                width: 100% !important;
+                height: auto !important;
                 border-radius: 8px !important;
                 aspect-ratio: auto !important;
                 object-fit: contain !important;
@@ -330,35 +381,48 @@ def guided_face_enrolment() -> None:
     if frame_shape == "Circular guide":
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if image and st.button("Save captured face sample"):
-        assessment = assess_face_capture(image.getvalue())
-        if not assessment["accepted"]:
-            st.error(str(assessment["message"]))
-            return
-        file_path = candidate_enrolment_dir(candidate_id) / f"{direction}.jpg"
-        embedding_path = candidate_enrolment_dir(candidate_id) / f"{direction}_embedding.npy"
-        write_bytes(file_path, image.getvalue())
-        embedding = extract_face_embedding(image.getvalue())
-        np.save(embedding_path, embedding)
-        record_face_sample(
-            candidate_id,
-            direction,
-            str(file_path),
-            quality_score=float(assessment["quality_score"]),
-            embedding_path=str(embedding_path),
-        )
-        if is_face_enrolment_complete(candidate_id):
-            from src.storage.candidate_repository import update_enrolment_status
-
-            update_enrolment_status(candidate_id, "face_enrolled")
-            st.success("Guided facial enrolment completed for all required directions.")
-        else:
-            st.success(f"Saved {direction_label} face sample. The next capture will load automatically.")
-        st.rerun()
+    if image:
+        process_face_capture(candidate_id, direction, direction_label, image.getvalue())
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if st.button("Back to registration"):
         st.session_state.enrolment_step = "register"
         st.rerun()
+
+
+def process_face_capture(candidate_id: str, direction: str, direction_label: str, image_bytes: bytes) -> None:
+    capture_hash = hashlib.sha256(image_bytes).hexdigest()
+    state_key = f"processed_capture_{candidate_id}_{direction}"
+    if st.session_state.get(state_key) == capture_hash:
+        st.info("This capture has already been processed. Clear photo to retake or wait for the next direction.")
+        return
+
+    assessment = assess_face_capture(image_bytes, direction)
+    if not assessment["accepted"]:
+        st.error(str(assessment["message"]))
+        return
+
+    file_path = candidate_enrolment_dir(candidate_id) / f"{direction}.jpg"
+    embedding_path = candidate_enrolment_dir(candidate_id) / f"{direction}_embedding.npy"
+    write_bytes(file_path, image_bytes)
+    embedding = extract_face_embedding(image_bytes, direction)
+    np.save(embedding_path, embedding)
+    record_face_sample(
+        candidate_id,
+        direction,
+        str(file_path),
+        quality_score=float(assessment["quality_score"]),
+        embedding_path=str(embedding_path),
+    )
+    st.session_state[state_key] = capture_hash
+    if is_face_enrolment_complete(candidate_id):
+        from src.storage.candidate_repository import update_enrolment_status
+
+        update_enrolment_status(candidate_id, "face_enrolled")
+        st.success("Accepted and saved. Guided facial enrolment is complete.")
+    else:
+        st.success(f"Accepted and saved {direction_label}. Loading the next capture...")
+    st.rerun()
 
 
 def render_capture_indicator(direction: str) -> None:
@@ -382,7 +446,7 @@ def render_capture_indicator(direction: str) -> None:
         f"""
         <div class="capture-guide">
             <div class="face-orb">{arrows[direction]}</div>
-            <strong>{notes[direction]}</strong>
+            <div><strong>{notes[direction]}</strong><br><span>Capture will be validated and saved automatically after you take the photo.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
