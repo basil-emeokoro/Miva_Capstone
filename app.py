@@ -20,6 +20,8 @@ from src.fusion.fusion_engine import FusionEngine
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
 from src.security.access_control import Role, has_permission
+from src.security.audit_logger import log_audit
+from src.session.environment_checker import CHECK_LABELS, device_check_allows_session_start, evaluate_device_checks
 from src.session.exam_controller import grade_answers, load_sample_questions
 from src.session.monitoring_mode_controller import MonitoringModeController
 from src.session.session_manager import list_sessions, start_session
@@ -30,6 +32,7 @@ from src.storage.candidate_repository import (
     save_candidate_custom_fields,
 )
 from src.storage.database import initialize_database
+from src.storage.device_check_repository import latest_device_check, save_device_check
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
 from src.utils.geodata import COUNTRIES, NIGERIA_LGAS, NIGERIA_STATES
@@ -731,18 +734,31 @@ def session_control(role: str) -> str | None:
     candidate = candidate_options[selected]
     candidate_id = str(candidate["candidate_id"])
     candidate_profile_summary(candidate_id)
-    authenticate_candidate_panel(role, candidate)
 
-    mode = st.selectbox("Monitoring mode", ["B", "A", "C"], key="session_monitoring_mode")
+    mode_options = {
+        "Mode B - dual-camera full mode": "B",
+        "Mode A - single-camera CBT mode": "A",
+        "Mode C - mirror-assisted low-resource mode": "C",
+    }
+    selected_mode_label = st.selectbox("Monitoring mode", list(mode_options), key="session_monitoring_mode")
+    mode = mode_options[selected_mode_label]
     plan = MonitoringModeController().configure(mode)
+    render_monitoring_mode_card(plan)
     st.caption(plan.confidence_note)
+    device_ready = pre_exam_device_check_panel(role, candidate_id, mode)
+
+    authenticate_candidate_panel(role, candidate)
 
     authenticated = st.session_state.get("authenticated_candidate_id") == candidate_id
     if not authenticated:
         st.warning("Authenticate this enrolled candidate before starting a session.")
+    if not device_ready:
+        st.warning("Pre-exam device and environment checks must pass, or a staff override must be recorded, before session start.")
 
-    if has_permission(role, "start_session") and st.button("Start prototype session", disabled=not authenticated):
+    can_start = authenticated and device_ready
+    if has_permission(role, "start_session") and st.button("Start prototype session", disabled=not can_start):
         session_id = start_session(candidate_id, candidate_id, mode)
+        log_audit(role, "session_started", session_id, f"candidate_id={candidate_id}; monitoring_mode={mode}")
         st.session_state.active_session_id = session_id
         st.session_state.active_candidate_id = candidate_id
         st.success(f"Started session {session_id}")
@@ -756,6 +772,99 @@ def session_control(role: str) -> str | None:
         st.session_state.active_candidate_id = next(s["candidate_id"] for s in sessions if s["session_id"] == session_id)
         return session_id
     return None
+
+
+def render_monitoring_mode_card(plan) -> None:
+    st.markdown(
+        f"""
+        <div class="status-card">
+            <strong>Monitoring Mode {plan.mode}</strong><br>
+            Enabled: {", ".join(plan.enabled_modules)}<br>
+            Disabled: {", ".join(plan.disabled_modules) if plan.disabled_modules else "None"}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def pre_exam_device_check_panel(role: str, candidate_id: str, mode: str) -> bool:
+    st.subheader("Pre-Exam Device and Environment Check")
+    st.caption("Checks are stored in SQLite, shown here as dashboard status cards, and logged in the audit trail. This panel does not open the camera automatically.")
+
+    latest_check = latest_device_check(candidate_id, mode)
+    if latest_check:
+        render_device_status_cards(latest_check)
+    else:
+        st.info("No saved device check for this candidate and monitoring mode yet.")
+
+    can_manage_check = has_permission(role, "start_session")
+    if not can_manage_check:
+        st.warning("Only Admin or Human Proctor can record pre-exam checks or overrides.")
+        return device_check_allows_session_start(latest_check)
+
+    with st.form(f"device_check_{candidate_id}_{mode}"):
+        required = set(evaluate_device_checks(mode, {}).required_checks)
+        st.write("Record check results")
+        col_a, col_b = st.columns(2)
+        values: dict[str, bool] = {}
+        for index, (check_name, label) in enumerate(CHECK_LABELS.items()):
+            target = col_a if index % 2 == 0 else col_b
+            with target:
+                help_text = "Required for selected monitoring mode." if check_name in required else "Optional for selected monitoring mode."
+                values[check_name] = st.checkbox(
+                    label,
+                    value=latest_check_allows(latest_check, check_name),
+                    disabled=check_name not in required,
+                    help=help_text,
+                    key=f"{candidate_id}_{mode}_{check_name}_check",
+                )
+        submitted = st.form_submit_button("Save pre-exam check")
+
+    if submitted:
+        evaluation = evaluate_device_checks(mode, values)
+        check_id = save_device_check(candidate_id, evaluation, role)
+        log_audit(role, "device_check_saved", check_id, f"candidate_id={candidate_id}; mode={mode}; status={evaluation.overall_status}")
+        st.success(f"Saved pre-exam check {check_id}: {evaluation.overall_status}.")
+        st.rerun()
+
+    with st.expander("Staff override for failed/missing checks", expanded=False):
+        st.caption("Override is recorded for audit. It permits the prototype session to start without all checks passing.")
+        override_reason = st.text_area("Override reason", key=f"device_override_reason_{candidate_id}_{mode}")
+        if st.button("Record device-check override", key=f"device_override_{candidate_id}_{mode}"):
+            evaluation = evaluate_device_checks(mode, {}, staff_override=True, override_reason=override_reason)
+            if evaluation.overall_status != "override":
+                st.error("Enter a clear override reason before recording staff override.")
+            else:
+                check_id = save_device_check(candidate_id, evaluation, role, staff_override=True, override_reason=override_reason)
+                log_audit(role, "device_check_override", check_id, f"candidate_id={candidate_id}; mode={mode}; reason={override_reason.strip()}")
+                st.warning(f"Device-check override recorded: {check_id}.")
+                st.rerun()
+
+    return device_check_allows_session_start(latest_device_check(candidate_id, mode))
+
+
+def latest_check_allows(latest_check: dict[str, object] | None, check_name: str) -> bool:
+    if not latest_check:
+        return False
+    return latest_check.get(f"{check_name}_status") == "passed"
+
+
+def render_device_status_cards(check: dict[str, object]) -> None:
+    statuses = {
+        "Primary": check["primary_camera_status"],
+        "Secondary": check["secondary_camera_status"],
+        "Microphone": check["microphone_status"],
+        "Lighting": check["lighting_status"],
+        "Presence": check["candidate_presence_status"],
+        "Environment": check["environment_declaration_status"],
+        "Mirror": check["mirror_status"],
+        "Overall": check["overall_status"],
+    }
+    cols = st.columns(4)
+    for index, (label, status) in enumerate(statuses.items()):
+        with cols[index % 4]:
+            st.metric(label, str(status).replace("_", " ").title())
+    st.caption(f"Latest check: {check['check_id']} | Mode {check['monitoring_mode']} | Checked by {check['checked_by']} at {check['checked_at']}")
 
 
 def candidate_profile_summary(candidate_id: str) -> None:

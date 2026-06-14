@@ -81,6 +81,26 @@ CREATE TABLE IF NOT EXISTS sessions (
     FOREIGN KEY(candidate_id) REFERENCES candidates(candidate_id)
 );
 
+CREATE TABLE IF NOT EXISTS device_checks (
+    check_id TEXT PRIMARY KEY,
+    candidate_id TEXT NOT NULL,
+    monitoring_mode TEXT NOT NULL,
+    primary_camera_status TEXT NOT NULL,
+    secondary_camera_status TEXT NOT NULL,
+    microphone_status TEXT NOT NULL,
+    lighting_status TEXT NOT NULL,
+    candidate_presence_status TEXT NOT NULL,
+    environment_declaration_status TEXT NOT NULL,
+    mirror_status TEXT NOT NULL,
+    overall_status TEXT NOT NULL,
+    staff_override INTEGER NOT NULL DEFAULT 0,
+    override_reason TEXT,
+    checked_by TEXT NOT NULL,
+    checked_at TEXT NOT NULL,
+    details TEXT,
+    FOREIGN KEY(candidate_id) REFERENCES candidates(candidate_id)
+);
+
 CREATE TABLE IF NOT EXISTS events (
     event_id TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
