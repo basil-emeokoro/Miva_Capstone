@@ -25,7 +25,7 @@ from src.storage.candidate_repository import list_candidates, register_candidate
 from src.storage.database import initialize_database
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
-from src.vision.face_quality import assess_face_capture, extract_face_embedding
+from src.vision.face_quality import assess_face_capture, extract_face_embedding, mirror_image_bytes
 from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
 
 
@@ -130,36 +130,14 @@ def apply_theme() -> None:
             border-color: #0a7f78;
             color: #ffffff;
         }
-        .capture-guide {
-            border: 1px solid #cfe0ea;
-            background: linear-gradient(180deg, #ffffff 0%, #f5fbfd 100%);
-            border-radius: 8px;
-            padding: .85rem 1rem;
-            margin: .6rem 0 .8rem 0;
-            display: grid;
-            grid-template-columns: 88px 1fr;
-            align-items: center;
-            gap: 1rem;
-        }
-        .face-orb {
-            width: 76px;
-            height: 76px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: radial-gradient(circle, #dff7f4 0%, #c7e9f2 62%, #0a7f78 64%, #063b5c 100%);
-            color: #063b5c;
-            font-size: 1.25rem;
-            font-weight: 800;
-            box-shadow: inset 0 0 0 10px rgba(255,255,255,.65), 0 12px 30px rgba(6,59,92,.18);
-        }
         .capture-shell {
             background: #ffffff;
             border: 1px solid #cfe0ea;
             border-radius: 10px;
-            padding: 1rem;
+            padding: .85rem;
             box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+            max-width: 720px;
+            margin: 0 auto;
         }
         .ai-status {
             display: flex;
@@ -193,8 +171,44 @@ def apply_theme() -> None:
             margin: 0 auto !important;
         }
         div[data-testid="stCameraInput"] {
-            max-width: 520px !important;
+            max-width: 360px !important;
             margin: 0 auto !important;
+            position: relative !important;
+        }
+        div[data-testid="stCameraInput"]::before {
+            content: var(--capture-guide-text, "Face guide");
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            padding: .35rem .7rem;
+            border-radius: 999px;
+            background: rgba(6, 59, 92, .86);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: .82rem;
+            text-align: center;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        div[data-testid="stCameraInput"]::after {
+            content: var(--capture-guide-arrow, "CENTER");
+            position: absolute;
+            top: 42px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            color: #ffffff;
+            background: rgba(10, 127, 120, .9);
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            pointer-events: none;
         }
         </style>
         """,
@@ -203,6 +217,16 @@ def apply_theme() -> None:
 
 
 def render_hero() -> None:
+    if st.session_state.get("enrolment_step") == "face":
+        st.markdown(
+            """
+            <div class="notice">
+                Guided enrolment is active. Follow the in-frame arrow and use AI auto-capture where available.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
     st.markdown(
         """
         <div class="hero">
@@ -339,7 +363,7 @@ def guided_face_enrolment() -> None:
     direction_label = direction.replace("_", " ").title()
     st.markdown(f"### Capture {len(done) + 1} of {len(FACE_DIRECTIONS)}: {direction_label}")
     st.markdown('<div class="capture-shell">', unsafe_allow_html=True)
-    render_capture_indicator(direction)
+    inject_capture_overlay(direction)
     st.markdown(
         '<div class="ai-status">AI guide: keep one face inside the circle, hold still, and improve lighting until the capture is accepted.</div>',
         unsafe_allow_html=True,
@@ -357,6 +381,19 @@ def guided_face_enrolment() -> None:
         st.caption("Fallback: use browser camera below if local webcam auto-capture is unavailable.")
 
     frame_shape = st.radio("Camera frame", ["Circular guide", "Original rectangle"], horizontal=True, index=0)
+    fix_mirror = st.checkbox("Correct mirrored webcam image", value=True)
+    if fix_mirror:
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stCameraInput"] video,
+            div[data-testid="stCameraInput"] img {
+                transform: scaleX(-1) !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
     if frame_shape == "Original rectangle":
         st.markdown(
             """
@@ -382,7 +419,10 @@ def guided_face_enrolment() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
     if image:
-        process_face_capture(candidate_id, direction, direction_label, image.getvalue())
+        image_bytes = image.getvalue()
+        if fix_mirror:
+            image_bytes = mirror_image_bytes(image_bytes)
+        process_face_capture(candidate_id, direction, direction_label, image_bytes)
     st.markdown("</div>", unsafe_allow_html=True)
 
     if st.button("Back to registration"):
@@ -425,29 +465,31 @@ def process_face_capture(candidate_id: str, direction: str, direction_label: str
     st.rerun()
 
 
-def render_capture_indicator(direction: str) -> None:
+def inject_capture_overlay(direction: str) -> None:
     arrows = {
         "front": "CENTER",
-        "left": "<",
-        "right": ">",
-        "slight_up": "^",
-        "slight_down": "v",
+        "left": "←",
+        "right": "→",
+        "slight_up": "↑",
+        "slight_down": "↓",
         "centre": "CENTER",
     }
     notes = {
-        "front": "Look directly into the camera with the full face inside the circle.",
-        "left": "Turn your face slightly to your left while keeping both eyes visible.",
-        "right": "Turn your face slightly to your right while keeping both eyes visible.",
-        "slight_up": "Tilt your face slightly upward while remaining visible.",
-        "slight_down": "Tilt your face slightly downward while remaining visible.",
-        "centre": "Return to a neutral centre-facing posture for confirmation.",
+        "front": "Look straight",
+        "left": "Turn left",
+        "right": "Turn right",
+        "slight_up": "Tilt up",
+        "slight_down": "Tilt down",
+        "centre": "Centre face",
     }
     st.markdown(
         f"""
-        <div class="capture-guide">
-            <div class="face-orb">{arrows[direction]}</div>
-            <div><strong>{notes[direction]}</strong><br><span>Capture will be validated and saved automatically after you take the photo.</span></div>
-        </div>
+        <style>
+        div[data-testid="stCameraInput"] {{
+            --capture-guide-text: "{notes[direction]}";
+            --capture-guide-arrow: "{arrows[direction]}";
+        }}
+        </style>
         """,
         unsafe_allow_html=True,
     )

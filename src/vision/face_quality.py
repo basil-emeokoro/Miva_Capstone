@@ -4,6 +4,18 @@ import cv2
 import numpy as np
 
 
+def mirror_image_bytes(image_bytes: bytes) -> bytes:
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("Image could not be decoded.")
+    flipped = cv2.flip(image, 1)
+    ok, encoded = cv2.imencode(".jpg", flipped)
+    if not ok:
+        raise ValueError("Image could not be encoded after mirror correction.")
+    return encoded.tobytes()
+
+
 def assess_face_capture(image_bytes: bytes, direction: str = "front") -> dict[str, object]:
     image_array = np.frombuffer(image_bytes, dtype=np.uint8)
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
@@ -17,7 +29,9 @@ def assess_face_capture(image_bytes: bytes, direction: str = "front") -> dict[st
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.equalizeHist(gray)
-    faces = _detect_faces(gray, direction)
+    detection = _detect_faces(gray, direction)
+    faces = detection["faces"]
+    orientation = detection["orientation"]
     brightness = float(np.mean(gray))
     sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
@@ -49,11 +63,19 @@ def assess_face_capture(image_bytes: bytes, direction: str = "front") -> dict[st
             "quality_score": 0.4,
             "message": "Capture appears blurred. Hold still and retake.",
         }
+    if direction in {"left", "right"} and orientation == "front":
+        return {
+            "accepted": False,
+            "face_count": 1,
+            "quality_score": 0.5,
+            "message": f"Face is still too front-facing. Turn slightly to your {direction} and retake.",
+        }
 
     quality = min(0.98, 0.55 + min(brightness / 255, 0.25) + min(sharpness / 600, 0.18))
     return {
         "accepted": True,
         "face_count": 1,
+        "orientation": orientation,
         "quality_score": round(float(quality), 2),
         "message": "Face detected. Capture quality is acceptable for prototype enrolment.",
     }
@@ -67,7 +89,7 @@ def extract_face_embedding(image_bytes: bytes, direction: str = "front") -> np.n
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.equalizeHist(gray)
-    faces = _detect_faces(gray, direction)
+    faces = _detect_faces(gray, direction)["faces"]
     if len(faces) != 1:
         raise ValueError("Exactly one face is required to generate a face template.")
 
@@ -82,7 +104,7 @@ def extract_face_embedding(image_bytes: bytes, direction: str = "front") -> np.n
     return embedding / norm
 
 
-def _detect_faces(gray: np.ndarray, direction: str) -> list[tuple[int, int, int, int]]:
+def _detect_faces(gray: np.ndarray, direction: str) -> dict[str, object]:
     cascade_names = [
         "haarcascade_frontalface_default.xml",
         "haarcascade_frontalface_alt2.xml",
@@ -96,7 +118,8 @@ def _detect_faces(gray: np.ndarray, direction: str) -> list[tuple[int, int, int,
         faces = cascade.detectMultiScale(gray, scaleFactor=1.06, minNeighbors=3, minSize=(40, 40))
         detected.extend(tuple(map(int, face)) for face in faces)
         if detected:
-            return _deduplicate_faces(detected)
+            orientation = "profile" if cascade_name == "haarcascade_profileface.xml" else "front"
+            return {"faces": _deduplicate_faces(detected), "orientation": orientation}
 
         if direction in {"left", "right"} and cascade_name == "haarcascade_profileface.xml":
             flipped = cv2.flip(gray, 1)
@@ -104,8 +127,8 @@ def _detect_faces(gray: np.ndarray, direction: str) -> list[tuple[int, int, int,
             width = gray.shape[1]
             detected.extend((int(width - x - w), int(y), int(w), int(h)) for x, y, w, h in faces)
             if detected:
-                return _deduplicate_faces(detected)
-    return []
+                return {"faces": _deduplicate_faces(detected), "orientation": "profile"}
+    return {"faces": [], "orientation": "unknown"}
 
 
 def _deduplicate_faces(faces: list[tuple[int, int, int, int]]) -> list[tuple[int, int, int, int]]:
