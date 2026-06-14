@@ -66,6 +66,14 @@ def apply_theme() -> None:
             margin-bottom: 1.4rem;
             box-shadow: 0 18px 42px rgba(6, 59, 92, 0.18);
         }
+        .hero .brand {
+            display: block;
+            margin: 0 0 .35rem 0;
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: .08rem;
+            color: #b9f4ef;
+        }
         .hero h1 {
             margin: 0 0 .45rem 0;
             font-size: 2.2rem;
@@ -263,6 +271,7 @@ def render_hero() -> None:
     st.markdown(
         """
         <div class="hero">
+            <span class="brand">SERPS</span>
             <h1>Secure Remote-Proctored Assessment Console</h1>
             <p>Explainable multi-modal monitoring, identity assurance, event fusion, and human-supervised review.</p>
         </div>
