@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS candidates (
     country TEXT,
     state TEXT,
     local_government_area TEXT,
+    postal_code TEXT,
     street_address TEXT,
     enrolment_status TEXT NOT NULL,
     created_at TEXT NOT NULL
@@ -167,6 +168,7 @@ def _ensure_candidate_columns(connection: sqlite3.Connection) -> None:
         "country": "TEXT",
         "state": "TEXT",
         "local_government_area": "TEXT",
+        "postal_code": "TEXT",
         "street_address": "TEXT",
     }
     for column, definition in required_columns.items():

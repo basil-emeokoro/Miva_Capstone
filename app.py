@@ -32,6 +32,7 @@ from src.storage.candidate_repository import (
 from src.storage.database import initialize_database
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
+from src.utils.geodata import COUNTRIES, NIGERIA_LGAS, NIGERIA_STATES
 from src.vision.face_quality import assess_face_capture, extract_face_embedding, mirror_image_bytes
 from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
 
@@ -287,7 +288,7 @@ def candidate_management(role: str) -> None:
     if "enrolment_step" not in st.session_state:
         st.session_state.enrolment_step = "register"
     if "custom_fields" not in st.session_state:
-        st.session_state.custom_fields = [{"label": "Department", "value": ""}]
+        st.session_state.custom_fields = [{"label": "Custom Reference", "type": "Text", "applies_to": "Generic", "value": ""}]
 
     render_enrolment_steps()
     if st.session_state.enrolment_step == "register":
@@ -317,6 +318,31 @@ def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
     render_candidate_profile(candidate_id)
 
 
+def candidate_profiles_page(role: str) -> None:
+    st.subheader("Candidate Profiles")
+    candidates = list_candidates()
+    if not candidates:
+        st.info("No candidate profiles are available yet.")
+        return
+
+    if role == Role.ADMIN.value:
+        visible_candidates = candidates
+        st.caption("Admin view: all candidate profiles and enrolment evidence.")
+    else:
+        active_candidate_id = st.session_state.get("active_candidate_id") or st.session_state.get("authenticated_candidate_id")
+        visible_candidates = [candidate for candidate in candidates if str(candidate["candidate_id"]) == str(active_candidate_id)]
+        st.caption("Restricted view: Human Proctors and Reviewers see assigned or active-session candidate profiles only.")
+
+    if not visible_candidates:
+        st.warning("No assigned candidate profile is available for this role yet.")
+        return
+
+    labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in visible_candidates]
+    selected = st.selectbox("Candidate", labels)
+    candidate_id = selected.split("(")[-1].rstrip(")")
+    render_candidate_profile(candidate_id, include_images=role == Role.ADMIN.value)
+
+
 def render_enrolment_steps() -> None:
     col_register, col_face, col_profile = st.columns(3)
     with col_register:
@@ -329,7 +355,7 @@ def render_enrolment_steps() -> None:
             st.session_state.enrolment_step = "face"
             st.rerun()
     with col_profile:
-        if st.button("3. Candidate Profile", type="primary" if st.session_state.enrolment_step == "profile" else "secondary"):
+        if st.button("3. View my Profile", type="primary" if st.session_state.enrolment_step == "profile" else "secondary"):
             st.session_state.enrolment_step = "profile"
             st.rerun()
 
@@ -341,10 +367,26 @@ def registration_wizard(role: str) -> None:
         field_count = st.number_input("Number of additional fields", min_value=0, max_value=8, value=len(st.session_state.custom_fields))
         current_fields = st.session_state.custom_fields[: int(field_count)]
         while len(current_fields) < int(field_count):
-            current_fields.append({"label": f"Custom field {len(current_fields) + 1}", "value": ""})
+            current_fields.append({"label": f"Custom field {len(current_fields) + 1}", "type": "Text", "applies_to": "All", "value": ""})
         st.session_state.custom_fields = current_fields
         for index, field in enumerate(st.session_state.custom_fields):
-            field["label"] = st.text_input(f"Field {index + 1} label", field["label"], key=f"custom_label_{index}")
+            col_label, col_type, col_scope = st.columns([2, 1, 1])
+            with col_label:
+                field["label"] = st.text_input(f"Field {index + 1} label", field["label"], key=f"custom_label_{index}")
+            with col_type:
+                field["type"] = st.selectbox(
+                    "Data type",
+                    ["Text", "Number", "Date", "Email", "Boolean"],
+                    index=["Text", "Number", "Date", "Email", "Boolean"].index(field.get("type", "Text")),
+                    key=f"custom_type_{index}",
+                )
+            with col_scope:
+                field["applies_to"] = st.selectbox(
+                    "Applies to",
+                    ["All", "Miva", "WAEC", "Generic"],
+                    index=["All", "Miva", "WAEC", "Generic"].index(field.get("applies_to", "All")),
+                    key=f"custom_scope_{index}",
+                )
 
     with st.form("candidate_form"):
         institution_type = st.selectbox("Institution profile", ["Miva", "WAEC", "Generic"])
@@ -355,33 +397,53 @@ def registration_wizard(role: str) -> None:
             st.caption("WAEC Candidate ID = 7-digit centre number + 3-digit candidate number.")
             waec_registration_number = st.text_input("Candidate Registration Number", "WAEC/REG/2026-A1")
             matric_number = ""
+            programme = ""
+            department = ""
         elif institution_type == "Miva":
             institution = st.text_input("Institution", "Miva Open University")
             candidate_identifier = st.text_input("Candidate ID (digits only)", "10000001")
             matric_number = st.text_input("Matric Number", "MIVA/CSC/2026/001")
+            programme = st.selectbox("Programme", ["Undergraduate", "Postgraduate"])
+            department = st.text_input("Department", "Computer Science")
             waec_registration_number = ""
         else:
             institution = st.text_input("Institution", "Demo Institution")
             candidate_identifier = st.text_input("Candidate ID", "CAND-DEMO-001")
             waec_registration_number = ""
             matric_number = ""
+            programme = ""
+            department = ""
         email = st.text_input("Email", "candidate@example.com")
         gender = st.selectbox("Gender", ["Female", "Male", "Other", "Prefer not to say"])
         date_of_birth = st.date_input("Date of birth", value=None)
         st.markdown("Address")
         col_country, col_state, col_lga = st.columns(3)
         with col_country:
-            country = st.text_input("Country", "Nigeria")
+            country_index = COUNTRIES.index("Nigeria") if "Nigeria" in COUNTRIES else 0
+            country = st.selectbox("Country", COUNTRIES, index=country_index)
         with col_state:
-            state = st.text_input("State", "")
+            if country == "Nigeria":
+                state = st.selectbox("State / FCT", NIGERIA_STATES)
+            else:
+                state = st.text_input("State / Province / Region", "")
         with col_lga:
-            local_government_area = st.text_input("Local Government Area", "")
+            if country == "Nigeria":
+                local_government_area = st.selectbox("Local Government Area", NIGERIA_LGAS.get(state, []))
+            else:
+                local_government_area = st.text_input("City / Locality", "")
+        postal_code = st.text_input("ZIP / Postal code", "")
         street_address = st.text_area("Street address", "")
         custom_values: dict[str, str] = {}
+        built_in_extra_fields = {
+            "Programme": programme,
+            "Department": department,
+        }
+        custom_values.update({key: value for key, value in built_in_extra_fields.items() if value})
         for index, field in enumerate(st.session_state.custom_fields):
             label = field["label"].strip()
-            if label:
-                custom_values[label] = st.text_input(label, field.get("value", ""), key=f"custom_value_{index}")
+            applies_to = field.get("applies_to", "All")
+            if label and applies_to in {"All", institution_type}:
+                custom_values[label] = render_custom_field_input(label, field.get("type", "Text"), index)
         consent = st.checkbox(CONSENT_NOTICE)
         submitted = st.form_submit_button("Register candidate and continue")
 
@@ -403,6 +465,7 @@ def registration_wizard(role: str) -> None:
                 country=country,
                 state=state,
                 local_government_area=local_government_area,
+                postal_code=postal_code,
                 street_address=street_address,
             )
         except ValueError as exc:
@@ -414,6 +477,20 @@ def registration_wizard(role: str) -> None:
         st.session_state.enrolment_step = "face"
         st.success(f"Candidate registered: {candidate_id}. Proceeding to guided face capture.")
         st.rerun()
+
+
+def render_custom_field_input(label: str, data_type: str, index: int) -> str:
+    key = f"custom_value_{index}"
+    if data_type == "Number":
+        return str(st.number_input(label, key=key, step=1))
+    if data_type == "Date":
+        value = st.date_input(label, value=None, key=key)
+        return value.isoformat() if value else ""
+    if data_type == "Email":
+        return st.text_input(label, key=key, placeholder="name@example.com")
+    if data_type == "Boolean":
+        return "Yes" if st.checkbox(label, key=key) else "No"
+    return st.text_input(label, key=key)
 
 
 def guided_face_enrolment() -> None:
@@ -642,7 +719,7 @@ def candidate_profile_summary(candidate_id: str) -> None:
         render_candidate_profile(candidate_id)
 
 
-def render_candidate_profile(candidate_id: str) -> None:
+def render_candidate_profile(candidate_id: str, include_images: bool = False) -> None:
     candidates = {str(candidate["candidate_id"]): candidate for candidate in list_candidates()}
     candidate = candidates.get(candidate_id)
     if not candidate:
@@ -674,6 +751,7 @@ def render_candidate_profile(candidate_id: str) -> None:
         {"field": "Country", "value": candidate.get("country")},
         {"field": "State", "value": candidate.get("state")},
         {"field": "Local Government Area", "value": candidate.get("local_government_area")},
+        {"field": "ZIP / Postal Code", "value": candidate.get("postal_code")},
         {"field": "Street Address", "value": candidate.get("street_address")},
     ]
     visible_identifier_rows = [row for row in identifier_rows if row["value"]]
@@ -688,6 +766,14 @@ def render_candidate_profile(candidate_id: str) -> None:
         st.write("Face enrolment records")
         visible_columns = ["capture_direction", "quality_score", "image_path", "embedding_path", "captured_at"]
         st.dataframe(pd.DataFrame(samples)[visible_columns], use_container_width=True)
+        if include_images:
+            st.write("Captured face samples")
+            cols = st.columns(3)
+            for index, sample in enumerate(samples):
+                image_path = sample.get("image_path")
+                if image_path:
+                    with cols[index % 3]:
+                        st.image(str(image_path), caption=str(sample["capture_direction"]), use_container_width=True)
 
 
 def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> None:
@@ -811,19 +897,21 @@ def main() -> None:
     role = selected_role()
     render_hero()
 
-    tabs = st.tabs(["Enrolment", "Session", "Test Player", "Monitoring", "Review", "Reports"])
+    tabs = st.tabs(["Enrolment", "Candidate Profiles", "Session", "Test Player", "Monitoring", "Review", "Reports"])
     with tabs[0]:
         candidate_management(role)
     with tabs[1]:
-        session_id = session_control(role)
+        candidate_profiles_page(role)
     with tabs[2]:
+        session_id = session_control(role)
+    with tabs[3]:
         mock_test_player()
     session_id = st.session_state.get("active_session_id")
-    with tabs[3]:
-        monitoring_panel(role, session_id)
     with tabs[4]:
-        alert_review_panel(role, session_id)
+        monitoring_panel(role, session_id)
     with tabs[5]:
+        alert_review_panel(role, session_id)
+    with tabs[6]:
         reports_panel(role, session_id)
 
 

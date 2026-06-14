@@ -20,6 +20,7 @@ def register_candidate(
     country: str | None = None,
     state: str | None = None,
     local_government_area: str | None = None,
+    postal_code: str | None = None,
     street_address: str | None = None,
 ) -> str:
     resolved_candidate_id = normalize_candidate_id(candidate_id, institution_type)
@@ -31,10 +32,10 @@ def register_candidate(
             INSERT INTO candidates(
                 candidate_id, full_name, exam_code, institution, email, institution_type,
                 waec_registration_number, centre_number, candidate_number, matric_number,
-                gender, date_of_birth, country, state, local_government_area, street_address,
+                gender, date_of_birth, country, state, local_government_area, postal_code, street_address,
                 enrolment_status, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 resolved_candidate_id,
@@ -52,6 +53,7 @@ def register_candidate(
                 country,
                 state,
                 local_government_area,
+                postal_code,
                 street_address,
                 "registered",
                 utc_now_iso(),
