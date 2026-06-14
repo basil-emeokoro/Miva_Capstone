@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+import numpy as np
 
 from src.audio.audio_event_detector import create_background_speech_event
 from src.enrolment.consent_manager import CONSENT_NOTICE, capture_consent
@@ -18,10 +19,11 @@ from src.security.access_control import Role, has_permission
 from src.session.exam_controller import grade_answers, load_sample_questions
 from src.session.monitoring_mode_controller import MonitoringModeController
 from src.session.session_manager import list_sessions, start_session
-from src.storage.candidate_repository import list_candidates, register_candidate
+from src.storage.candidate_repository import list_candidates, register_candidate, save_candidate_custom_fields
 from src.storage.database import initialize_database
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
+from src.vision.face_quality import assess_face_capture, extract_face_embedding
 from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
 
 
@@ -78,6 +80,8 @@ def apply_theme() -> None:
         }
         div[data-testid="stButton"] button,
         div[data-baseweb="select"],
+        div[data-baseweb="select"] *,
+        div[data-baseweb="select"] svg,
         label[data-testid="stWidgetLabel"],
         input,
         textarea,
@@ -98,8 +102,67 @@ def apply_theme() -> None:
             border-color: #0a7f78 !important;
             box-shadow: 0 0 0 1px rgba(10, 127, 120, .15);
         }
+        div[data-baseweb="select"] > div:hover svg {
+            color: #0a7f78 !important;
+            fill: #0a7f78 !important;
+            transform: scale(1.18);
+            transition: transform .12s ease, fill .12s ease;
+        }
         .stTabs [role="tab"]:hover {
             color: #0a7f78;
+        }
+        .wizard-step {
+            display: inline-flex;
+            align-items: center;
+            gap: .55rem;
+            margin: .2rem .55rem 1rem 0;
+            padding: .55rem .85rem;
+            border-radius: 999px;
+            background: #e9f2f7;
+            border: 1px solid #cfe0ea;
+            font-weight: 600;
+            color: #355064;
+        }
+        .wizard-step.active {
+            background: #0a7f78;
+            border-color: #0a7f78;
+            color: #ffffff;
+        }
+        .capture-guide {
+            border: 1px solid #cfe0ea;
+            background: linear-gradient(180deg, #ffffff 0%, #f5fbfd 100%);
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+        .face-orb {
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: .6rem auto;
+            background: radial-gradient(circle, #dff7f4 0%, #c7e9f2 62%, #0a7f78 64%, #063b5c 100%);
+            color: #063b5c;
+            font-size: 3rem;
+            font-weight: 800;
+            box-shadow: inset 0 0 0 10px rgba(255,255,255,.65), 0 12px 30px rgba(6,59,92,.18);
+        }
+        .stCameraInput video,
+        .stCameraInput img {
+            cursor: crosshair !important;
+        }
+        .camera-circular .stCameraInput video,
+        .camera-circular .stCameraInput img,
+        div[data-testid="stCameraInput"] video,
+        div[data-testid="stCameraInput"] img {
+            max-width: 280px !important;
+            border-radius: 999px !important;
+            aspect-ratio: 1 / 1 !important;
+            object-fit: cover !important;
+            border: 4px solid #0a7f78 !important;
+            box-shadow: 0 10px 30px rgba(6,59,92,.18);
         }
         </style>
         """,
@@ -136,33 +199,79 @@ def candidate_management(role: str) -> None:
         st.info("Your role can view monitoring data but cannot register candidates.")
         return
 
-    st.markdown("#### 1. Register candidate and capture consent")
+    if "enrolment_step" not in st.session_state:
+        st.session_state.enrolment_step = "register"
+    if "custom_fields" not in st.session_state:
+        st.session_state.custom_fields = [{"label": "Department", "value": ""}]
+
+    render_enrolment_steps()
+    if st.session_state.enrolment_step == "register":
+        registration_wizard(role)
+    else:
+        guided_face_enrolment()
+
+
+def render_enrolment_steps() -> None:
+    register_state = "active" if st.session_state.enrolment_step == "register" else ""
+    face_state = "active" if st.session_state.enrolment_step == "face" else ""
+    st.markdown(
+        f"""
+        <div>
+            <span class="wizard-step {register_state}">1. Registration + Consent</span>
+            <span class="wizard-step {face_state}">2. Guided Face Capture</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def registration_wizard(role: str) -> None:
+    st.markdown("#### Register candidate and capture consent")
+    with st.expander("Admin field customization", expanded=False):
+        st.caption("Prototype custom fields apply to this registration form submission.")
+        field_count = st.number_input("Number of additional fields", min_value=0, max_value=8, value=len(st.session_state.custom_fields))
+        current_fields = st.session_state.custom_fields[: int(field_count)]
+        while len(current_fields) < int(field_count):
+            current_fields.append({"label": f"Custom field {len(current_fields) + 1}", "value": ""})
+        st.session_state.custom_fields = current_fields
+        for index, field in enumerate(st.session_state.custom_fields):
+            field["label"] = st.text_input(f"Field {index + 1} label", field["label"], key=f"custom_label_{index}")
+
     with st.form("candidate_form"):
         full_name = st.text_input("Full name", "Demo Candidate")
         exam_code = st.text_input("Exam code", "MIVA-CAPSTONE-001")
         institution = st.text_input("Institution", "Miva Open University")
         email = st.text_input("Email", "candidate@example.com")
+        custom_values: dict[str, str] = {}
+        for index, field in enumerate(st.session_state.custom_fields):
+            label = field["label"].strip()
+            if label:
+                custom_values[label] = st.text_input(label, field.get("value", ""), key=f"custom_value_{index}")
         consent = st.checkbox(CONSENT_NOTICE)
-        submitted = st.form_submit_button("Register candidate")
+        submitted = st.form_submit_button("Register candidate and continue")
 
     if submitted:
         if not consent:
             st.error("Consent is required before enrolment.")
             return
         candidate_id = register_candidate(full_name, exam_code, institution, email)
+        save_candidate_custom_fields(candidate_id, custom_values)
         capture_consent(candidate_id)
         st.session_state.enrolment_candidate_id = candidate_id
-        st.success(f"Candidate registered: {candidate_id}. Continue to guided face capture below.")
-
-    guided_face_enrolment()
+        st.session_state.enrolment_step = "face"
+        st.success(f"Candidate registered: {candidate_id}. Proceeding to guided face capture.")
+        st.rerun()
 
 
 def guided_face_enrolment() -> None:
     candidates = list_candidates()
-    st.markdown("#### 2. Guided facial enrolment")
-    st.caption("Use the browser camera capture for each required direction. This creates real image evidence records for the prototype.")
+    st.markdown("#### Guided facial enrolment")
+    st.caption("AI validation checks that a single face is visible before each sample is saved.")
     if not candidates:
         st.info("No registered candidates yet.")
+        if st.button("Back to registration"):
+            st.session_state.enrolment_step = "register"
+            st.rerun()
         return
 
     candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
@@ -181,29 +290,103 @@ def guided_face_enrolment() -> None:
     progress = len(done) / len(FACE_DIRECTIONS)
     st.progress(progress, text=f"{len(done)} of {len(FACE_DIRECTIONS)} directions captured")
 
-    cols = st.columns(len(FACE_DIRECTIONS))
-    for index, direction in enumerate(FACE_DIRECTIONS):
-        with cols[index]:
-            status = "Captured" if direction in done else "Pending"
-            st.metric(direction.replace("_", " ").title(), status)
-
     remaining = [direction for direction in FACE_DIRECTIONS if direction not in done]
-    direction = st.selectbox("Capture direction", remaining or FACE_DIRECTIONS)
-    st.info(f"Position face for: {direction.replace('_', ' ').title()}")
-    image = st.camera_input("Activate camera and capture face sample", key=f"camera_{candidate_id}_{direction}")
+    if not remaining:
+        st.success("Guided facial enrolment is complete for this candidate.")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("Register another candidate"):
+                st.session_state.enrolment_step = "register"
+                st.session_state.pop("enrolment_candidate_id", None)
+                st.rerun()
+        with col_b:
+            st.caption("Next workflow: authenticate candidate and start session monitoring.")
+        return
+
+    direction = remaining[0]
+    direction_label = direction.replace("_", " ").title()
+    st.markdown(f"### Capture {len(done) + 1} of {len(FACE_DIRECTIONS)}: {direction_label}")
+    render_capture_indicator(direction)
+    frame_shape = st.radio("Camera frame", ["Circular guide", "Original rectangle"], horizontal=True, index=0)
+    if frame_shape == "Original rectangle":
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stCameraInput"] video,
+            div[data-testid="stCameraInput"] img {
+                max-width: 100% !important;
+                border-radius: 8px !important;
+                aspect-ratio: auto !important;
+                object-fit: contain !important;
+                border: 2px solid #cfe0ea !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    if frame_shape == "Circular guide":
+        st.markdown('<div class="camera-circular">', unsafe_allow_html=True)
+    image = st.camera_input(f"Activate camera and capture {direction_label} face sample", key=f"camera_{candidate_id}_{direction}")
+    if frame_shape == "Circular guide":
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if image and st.button("Save captured face sample"):
+        assessment = assess_face_capture(image.getvalue())
+        if not assessment["accepted"]:
+            st.error(str(assessment["message"]))
+            return
         file_path = candidate_enrolment_dir(candidate_id) / f"{direction}.jpg"
+        embedding_path = candidate_enrolment_dir(candidate_id) / f"{direction}_embedding.npy"
         write_bytes(file_path, image.getvalue())
-        record_face_sample(candidate_id, direction, str(file_path), quality_score=0.85)
+        embedding = extract_face_embedding(image.getvalue())
+        np.save(embedding_path, embedding)
+        record_face_sample(
+            candidate_id,
+            direction,
+            str(file_path),
+            quality_score=float(assessment["quality_score"]),
+            embedding_path=str(embedding_path),
+        )
         if is_face_enrolment_complete(candidate_id):
             from src.storage.candidate_repository import update_enrolment_status
 
             update_enrolment_status(candidate_id, "face_enrolled")
             st.success("Guided facial enrolment completed for all required directions.")
         else:
-            st.success(f"Saved {direction.replace('_', ' ')} face sample.")
+            st.success(f"Saved {direction_label} face sample. The next capture will load automatically.")
         st.rerun()
+
+    if st.button("Back to registration"):
+        st.session_state.enrolment_step = "register"
+        st.rerun()
+
+
+def render_capture_indicator(direction: str) -> None:
+    arrows = {
+        "front": "CENTER",
+        "left": "<",
+        "right": ">",
+        "slight_up": "^",
+        "slight_down": "v",
+        "centre": "CENTER",
+    }
+    notes = {
+        "front": "Look directly into the camera with the full face inside the circle.",
+        "left": "Turn your face slightly to your left while keeping both eyes visible.",
+        "right": "Turn your face slightly to your right while keeping both eyes visible.",
+        "slight_up": "Tilt your face slightly upward while remaining visible.",
+        "slight_down": "Tilt your face slightly downward while remaining visible.",
+        "centre": "Return to a neutral centre-facing posture for confirmation.",
+    }
+    st.markdown(
+        f"""
+        <div class="capture-guide">
+            <div class="face-orb">{arrows[direction]}</div>
+            <strong>{notes[direction]}</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def session_control(role: str) -> str | None:

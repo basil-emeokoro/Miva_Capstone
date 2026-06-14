@@ -10,7 +10,13 @@ from src.utils.time_utils import utc_now_iso
 FACE_DIRECTIONS = ["front", "left", "right", "slight_up", "slight_down", "centre"]
 
 
-def record_face_sample(candidate_id: str, capture_direction: str, image_path: str | None = None, quality_score: float = 0.8) -> str:
+def record_face_sample(
+    candidate_id: str,
+    capture_direction: str,
+    image_path: str | None = None,
+    quality_score: float = 0.8,
+    embedding_path: str | None = None,
+) -> str:
     if capture_direction not in FACE_DIRECTIONS:
         raise ValueError(f"Unsupported face direction: {capture_direction}")
 
@@ -21,7 +27,7 @@ def record_face_sample(candidate_id: str, capture_direction: str, image_path: st
             INSERT INTO face_enrolment(face_record_id, candidate_id, capture_direction, image_path, embedding_path, quality_score, captured_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (face_record_id, candidate_id, capture_direction, image_path, None, quality_score, utc_now_iso()),
+            (face_record_id, candidate_id, capture_direction, image_path, embedding_path, quality_score, utc_now_iso()),
         )
     return face_record_id
 

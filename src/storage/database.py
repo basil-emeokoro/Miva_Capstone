@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS face_enrolment (
     FOREIGN KEY(candidate_id) REFERENCES candidates(candidate_id)
 );
 
+CREATE TABLE IF NOT EXISTS candidate_custom_fields (
+    field_id TEXT PRIMARY KEY,
+    candidate_id TEXT NOT NULL,
+    field_name TEXT NOT NULL,
+    field_value TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(candidate_id) REFERENCES candidates(candidate_id)
+);
+
 CREATE TABLE IF NOT EXISTS voice_enrolment (
     voice_record_id TEXT PRIMARY KEY,
     candidate_id TEXT NOT NULL,
