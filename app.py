@@ -289,6 +289,9 @@ def candidate_management(role: str) -> None:
         st.session_state.enrolment_step = "register"
     if "custom_fields" not in st.session_state:
         st.session_state.custom_fields = [{"label": "Custom Reference", "type": "Text", "applies_to": "Generic", "value": ""}]
+    active_enrolment_candidate = st.session_state.get("enrolment_candidate_id")
+    if st.session_state.enrolment_step == "profile" and not _candidate_face_complete(active_enrolment_candidate):
+        st.session_state.enrolment_step = "register"
 
     render_enrolment_steps()
     if st.session_state.enrolment_step == "register":
@@ -306,7 +309,12 @@ def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
     if not candidates:
         st.info("No enrolled candidates are available yet.")
         return
-    labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in candidates]
+    search = st.text_input("Search candidate", key="enrolment_profile_search", placeholder="Type name, Student ID, or Candidate ID")
+    filtered_candidates = _filter_candidates(candidates, search)
+    if not filtered_candidates:
+        st.warning("No candidate matches your search.")
+        return
+    labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in filtered_candidates]
     default_index = 0
     if default_candidate_id:
         for index, label in enumerate(labels):
@@ -337,10 +345,30 @@ def candidate_profiles_page(role: str) -> None:
         st.warning("No assigned candidate profile is available for this role yet.")
         return
 
+    search = st.text_input("Search candidate profiles", key=f"candidate_profiles_search_{role}", placeholder="Type name, Student ID, or Candidate ID")
+    visible_candidates = _filter_candidates(visible_candidates, search)
+    if not visible_candidates:
+        st.warning("No candidate profile matches your search.")
+        return
+
     labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in visible_candidates]
     selected = st.selectbox("Candidate", labels, key=f"candidate_profiles_select_{role}")
     candidate_id = selected.split("(")[-1].rstrip(")")
     render_candidate_profile(candidate_id, include_images=role == Role.ADMIN.value)
+
+
+def _filter_candidates(candidates: list[dict[str, object]], search: str) -> list[dict[str, object]]:
+    query = search.strip().lower()
+    if not query:
+        return candidates
+    return [
+        candidate
+        for candidate in candidates
+        if query in str(candidate.get("full_name", "")).lower()
+        or query in str(candidate.get("candidate_id", "")).lower()
+        or query in str(candidate.get("matric_number", "")).lower()
+        or query in str(candidate.get("waec_registration_number", "")).lower()
+    ]
 
 
 def render_enrolment_steps() -> None:
@@ -355,9 +383,18 @@ def render_enrolment_steps() -> None:
             st.session_state.enrolment_step = "face"
             st.rerun()
     with col_profile:
-        if st.button("3. View my Profile", type="primary" if st.session_state.enrolment_step == "profile" else "secondary"):
+        profile_disabled = not _candidate_face_complete(st.session_state.get("enrolment_candidate_id"))
+        if st.button(
+            "3. View my Profile",
+            disabled=profile_disabled,
+            type="primary" if st.session_state.enrolment_step == "profile" else "secondary",
+        ):
             st.session_state.enrolment_step = "profile"
             st.rerun()
+
+
+def _candidate_face_complete(candidate_id: object | None) -> bool:
+    return bool(candidate_id) and is_face_enrolment_complete(str(candidate_id))
 
 
 def registration_wizard(role: str) -> None:
@@ -667,6 +704,7 @@ def inject_capture_overlay(direction: str) -> None:
         "slight_down": "Tilt down",
         "centre": "Centre face",
     }
+    arrows.update({"left": "LEFT", "right": "RIGHT", "slight_up": "UP", "slight_down": "DOWN"})
     st.markdown(
         f"""
         <style>
@@ -768,7 +806,8 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False) ->
     st.progress(len(captured) / len(FACE_DIRECTIONS), text=f"{len(captured)} of {len(FACE_DIRECTIONS)} required face samples captured")
     if custom_fields:
         st.write("Custom fields")
-        st.dataframe(pd.DataFrame(custom_fields)[["field_name", "field_value"]], use_container_width=True)
+        field_rows = pd.DataFrame(custom_fields)[["field_name", "field_value"]]
+        st.dataframe(field_rows, use_container_width=True)
     if samples:
         st.write("Face enrolment records")
         visible_columns = ["capture_direction", "quality_score", "image_path", "embedding_path", "captured_at"]
