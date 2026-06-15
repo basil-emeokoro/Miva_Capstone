@@ -2,7 +2,7 @@
 
 Local-first capstone prototype for secure remote-proctored assessments in Nigeria.
 
-Platform identity: SERPS — Secure Explainable Remote Proctoring System.
+Platform identity: SERPS - Secure Explainable Remote Proctoring System.
 
 The system demonstrates candidate enrolment, consent capture, monitoring-mode selection, mock assessment delivery, structured event generation, explainable event fusion, role-aware human review, and report export.
 
@@ -35,10 +35,19 @@ python -m streamlit run app.py --server.port 8502
 ## Known Limitations
 
 - This is not a production-grade proctoring platform.
-- Camera, face recognition, voice verification, and object detection are currently represented through prototype event flows.
+- Camera previews are user-triggered only. This preserves browser privacy and prevents camera activation on page load.
+- Pre-exam device checks are prototype confirmations. Primary/secondary camera checks can use explicit Streamlit camera previews; microphone, lighting, candidate presence, environment declaration, and mirror placement are manual staff confirmations.
+- Streamlit does not provide a built-in local microphone test equivalent to `st.camera_input`, so microphone readiness is represented as a manual prototype check.
+- Face recognition is implemented for enrolment/authentication, while advanced voice verification and object detection remain represented through prototype event flows.
 - The mock assessment is not a full exam engine.
 - RBAC is local prototype authorization only.
 - SQLite is used for local demonstration.
+
+## Monitoring Modes and Pre-Exam Checks
+
+- Mode A - single-camera CBT mode: requires primary camera, microphone, lighting, candidate presence, and environment declaration. Secondary camera and mirror are not required.
+- Mode B - dual-camera full mode: requires primary camera, secondary camera, microphone, lighting, candidate presence, and environment declaration. Mirror is not required.
+- Mode C - mirror-assisted low-resource mode: requires primary camera, microphone, lighting, candidate presence, environment declaration, and mirror placement. Secondary camera is not required.
 
 ## Public Documentation
 

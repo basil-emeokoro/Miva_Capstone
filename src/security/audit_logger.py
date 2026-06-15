@@ -17,3 +17,16 @@ def log_audit(actor: str, action: str, target: str, details: str = "") -> str:
             (audit_id, actor, action, target, utc_now_iso(), details),
         )
     return audit_id
+
+
+def list_recent_audit_logs(limit: int = 25) -> list[dict[str, object]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM audit_logs
+            ORDER BY timestamp DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
