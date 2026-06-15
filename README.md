@@ -2,6 +2,8 @@
 
 Local-first capstone prototype for secure remote-proctored assessments in Nigeria.
 
+Platform identity: SERPS — Secure Explainable Remote Proctoring System.
+
 The system demonstrates candidate enrolment, consent capture, monitoring-mode selection, mock assessment delivery, structured event generation, explainable event fusion, role-aware human review, and report export.
 
 ## Core Principle

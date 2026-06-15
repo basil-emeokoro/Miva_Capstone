@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 import numpy as np
@@ -40,11 +43,27 @@ from src.vision.face_quality import assess_face_capture, extract_face_embedding,
 from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
 
 
-st.set_page_config(page_title="Explainable Proctoring System", layout="wide")
+APP_ROOT = Path(__file__).resolve().parent
+SERPS_LOGO_PATH = APP_ROOT / "assets" / "SERPS_Logo.png"
+
+
+st.set_page_config(
+    page_title="SERPS - Explainable Proctoring System",
+    page_icon=str(SERPS_LOGO_PATH) if SERPS_LOGO_PATH.exists() else None,
+    layout="wide",
+)
 initialize_database()
 
 if "fusion_engine" not in st.session_state:
     st.session_state.fusion_engine = FusionEngine()
+
+
+@st.cache_data(show_spinner=False)
+def logo_data_uri() -> str:
+    if not SERPS_LOGO_PATH.exists():
+        return ""
+    encoded = base64.b64encode(SERPS_LOGO_PATH.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def apply_theme() -> None:
@@ -66,6 +85,24 @@ def apply_theme() -> None:
             margin-bottom: 1.4rem;
             box-shadow: 0 18px 42px rgba(6, 59, 92, 0.18);
         }
+        .hero-identity {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .hero-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 14px;
+            object-fit: contain;
+            background: rgba(255,255,255,.94);
+            padding: .35rem;
+            box-shadow: 0 10px 24px rgba(2, 18, 33, .18);
+            flex: 0 0 auto;
+        }
+        .hero-copy {
+            min-width: 0;
+        }
         .hero .brand {
             display: block;
             margin: 0 0 .35rem 0;
@@ -83,6 +120,45 @@ def apply_theme() -> None:
             margin: 0;
             color: #d7edf5;
             font-size: 1rem;
+        }
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            margin: .2rem 0 1.2rem 0;
+        }
+        .sidebar-brand img {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            object-fit: contain;
+            background: #ffffff;
+            padding: .25rem;
+            border: 1px solid #d7e2eb;
+        }
+        .sidebar-brand strong {
+            display: block;
+            color: #0f172a;
+            font-size: 1.05rem;
+            line-height: 1.1;
+        }
+        .sidebar-brand span {
+            display: block;
+            color: #64748b;
+            font-size: .76rem;
+        }
+        @media (max-width: 720px) {
+            .hero-identity {
+                align-items: flex-start;
+            }
+            .hero-logo {
+                width: 50px;
+                height: 50px;
+                border-radius: 12px;
+            }
+            .hero h1 {
+                font-size: 1.65rem;
+            }
         }
         .notice {
             background: #fff8dc;
@@ -268,12 +344,19 @@ def render_hero() -> None:
             unsafe_allow_html=True,
         )
         return
+    logo_src = logo_data_uri()
+    logo_markup = f'<img class="hero-logo" src="{logo_src}" alt="SERPS logo">' if logo_src else ""
     st.markdown(
-        """
+        f"""
         <div class="hero">
-            <span class="brand">SERPS</span>
-            <h1>Secure Remote-Proctored Assessment Console</h1>
-            <p>Explainable multi-modal monitoring, identity assurance, event fusion, and human-supervised review.</p>
+            <div class="hero-identity">
+                {logo_markup}
+                <div class="hero-copy">
+                    <span class="brand">SERPS</span>
+                    <h1>Secure Remote-Proctored Assessment Console</h1>
+                    <p>Explainable multi-modal monitoring, identity assurance, event fusion, and human-supervised review.</p>
+                </div>
+            </div>
         </div>
         <div class="notice">
             Research prototype for academic demonstration. AI-generated alerts support human review and must not be treated as automatic misconduct decisions.
@@ -285,7 +368,22 @@ def render_hero() -> None:
 
 def selected_role() -> str:
     with st.sidebar:
-        st.title("Proctoring Control")
+        logo_src = logo_data_uri()
+        if logo_src:
+            st.markdown(
+                f"""
+                <div class="sidebar-brand">
+                    <img src="{logo_src}" alt="SERPS logo">
+                    <div>
+                        <strong>SERPS</strong>
+                        <span>Proctoring Control</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.title("Proctoring Control")
         role = st.selectbox("Role", [role.value for role in Role])
         st.caption("Prototype RBAC. Not enterprise authentication.")
     return role
