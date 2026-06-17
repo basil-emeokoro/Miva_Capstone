@@ -38,6 +38,7 @@ python -m streamlit run app.py --server.port 8502
 - Camera previews are user-triggered only. This preserves browser privacy and prevents camera activation on page load.
 - Pre-exam device checks are prototype confirmations. Primary/secondary camera checks can use explicit Streamlit camera previews; microphone, lighting, candidate presence, environment declaration, and mirror placement are manual staff confirmations.
 - Streamlit does not provide a built-in local microphone test equivalent to `st.camera_input`, so microphone readiness is represented as a manual prototype check.
+- Streamlit tabs eagerly default to the first tab and do not provide full routed-page behaviour, so this prototype uses sidebar-controlled page navigation and session-state wizard steps for cleaner flow control.
 - Face recognition is implemented for enrolment/authentication, while advanced voice verification and object detection remain represented through prototype event flows.
 - The mock assessment is not a full exam engine.
 - RBAC is local prototype authorization only.

@@ -1,13 +1,13 @@
 [
   {
     "question_id": "Q1",
-    "prompt": "Which module is responsible for combining events from camera, audio, identity, and behaviour modules?",
+    "prompt": "Which module combines camera, audio, identity, and behaviour events into explainable alerts?",
     "options": ["Event Fusion Engine", "Voice Enrolment Module", "Camera Discovery Module", "Report Exporter"],
     "answer": "Event Fusion Engine"
   },
   {
     "question_id": "Q2",
-    "prompt": "Who makes the final misconduct decision in the prototype?",
+    "prompt": "Who makes the final misconduct decision in the SERPS prototype?",
     "options": ["Human Reviewer", "YOLO Model", "Audio Detector", "Liveness Checker"],
     "answer": "Human Reviewer"
   },
@@ -16,5 +16,77 @@
     "prompt": "Which monitoring mode is the recommended full remote-proctoring mode?",
     "options": ["Mode A", "Mode B", "Mode C", "Offline Mode"],
     "answer": "Mode B"
+  },
+  {
+    "question_id": "Q4",
+    "prompt": "What is the main privacy reason camera capture is not activated on page load?",
+    "options": ["The user must explicitly start camera use", "The browser cannot display video", "SQLite blocks webcam access", "Reports require no camera"],
+    "answer": "The user must explicitly start camera use"
+  },
+  {
+    "question_id": "Q5",
+    "prompt": "In Mode C, what compensates for the absence of a secondary camera?",
+    "options": ["Mirror-assisted room view", "Offline marking", "Reviewer password", "Text-only monitoring"],
+    "answer": "Mirror-assisted room view"
+  },
+  {
+    "question_id": "Q6",
+    "prompt": "What should an explainable AI alert include for reviewer confidence?",
+    "options": ["Contributing events and rationale", "Only a punishment label", "Only raw camera frames", "A hidden model score"],
+    "answer": "Contributing events and rationale"
+  },
+  {
+    "question_id": "Q7",
+    "prompt": "Which check helps verify that the authenticated person matches the enrolled candidate?",
+    "options": ["Identity assurance", "ZIP code validation", "Report export", "Theme selection"],
+    "answer": "Identity assurance"
+  },
+  {
+    "question_id": "Q8",
+    "prompt": "What is the purpose of a staff override in the prototype?",
+    "options": ["Record accountable human authorization when a gate cannot pass normally", "Delete audit records", "Disable all monitoring permanently", "Automatically convict a candidate"],
+    "answer": "Record accountable human authorization when a gate cannot pass normally"
+  },
+  {
+    "question_id": "Q9",
+    "prompt": "Which data store persists local candidate, session, device-check, and audit data in this prototype?",
+    "options": ["SQLite", "Redis only", "Browser cookies only", "Static CSS files"],
+    "answer": "SQLite"
+  },
+  {
+    "question_id": "Q10",
+    "prompt": "What is the role of behavioural analytics in a remote-proctoring workflow?",
+    "options": ["Identify behaviour events that may require review", "Replace human reviewers", "Generate candidate IDs", "Change exam questions randomly"],
+    "answer": "Identify behaviour events that may require review"
+  },
+  {
+    "question_id": "Q11",
+    "prompt": "What kind of event may audio intelligence contribute to the fusion engine?",
+    "options": ["Background speech or suspicious audio activity", "Student ID creation", "Database migration", "Logo rendering"],
+    "answer": "Background speech or suspicious audio activity"
+  },
+  {
+    "question_id": "Q12",
+    "prompt": "Why is dual-camera monitoring stronger than single-camera monitoring?",
+    "options": ["It gives wider candidate and room visibility", "It removes the need for consent", "It disables identity checks", "It hides evidence from reviewers"],
+    "answer": "It gives wider candidate and room visibility"
+  },
+  {
+    "question_id": "Q13",
+    "prompt": "What is Agentic AI orchestration expected to coordinate in this system?",
+    "options": ["Multiple monitoring and explanation services", "Only static page colours", "Candidate birthdays only", "Browser bookmarks"],
+    "answer": "Multiple monitoring and explanation services"
+  },
+  {
+    "question_id": "Q14",
+    "prompt": "Why should risk scores be treated as decision support rather than final judgment?",
+    "options": ["Human review is required before final action", "Scores are always legally final", "The dashboard has no reviewers", "Risk scores replace evidence"],
+    "answer": "Human review is required before final action"
+  },
+  {
+    "question_id": "Q15",
+    "prompt": "Which item is required in Mode B but not required in Mode A?",
+    "options": ["Secondary camera", "Candidate consent", "Primary camera", "Microphone"],
+    "answer": "Secondary camera"
   }
 ]

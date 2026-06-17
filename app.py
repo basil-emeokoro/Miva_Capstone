@@ -45,6 +45,17 @@ from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_v
 
 APP_ROOT = Path(__file__).resolve().parent
 SERPS_LOGO_PATH = APP_ROOT / "assets" / "SERPS_Logo.png"
+PAGES = ["Home", "Enrolment", "Candidate Profiles", "Session", "Test Player", "Monitoring", "Review", "Reports"]
+PAGE_SLUGS = {
+    "Home": "home",
+    "Enrolment": "enrolment",
+    "Candidate Profiles": "candidate-profiles",
+    "Session": "session",
+    "Test Player": "test-player",
+    "Monitoring": "monitoring",
+    "Review": "review",
+    "Reports": "reports",
+}
 
 
 st.set_page_config(
@@ -74,8 +85,11 @@ def apply_theme() -> None:
             background: linear-gradient(180deg, #f3f7fb 0%, #eef4f8 42%, #ffffff 100%);
         }
         section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #e8eef5 0%, #f7fafc 100%);
-            border-right: 1px solid #d6e0ea;
+            background: linear-gradient(180deg, #e0edf2 0%, #eef6f7 48%, #f8fbfc 100%);
+            border-right: 1px solid #c8dce4;
+        }
+        .block-container {
+            padding-top: 2.2rem;
         }
         .hero {
             background: linear-gradient(135deg, #063b5c 0%, #075a75 52%, #0a7f78 100%);
@@ -159,6 +173,9 @@ def apply_theme() -> None:
             .hero h1 {
                 font-size: 1.65rem;
             }
+            .module-grid {
+                grid-template-columns: 1fr;
+            }
         }
         .notice {
             background: #fff8dc;
@@ -174,6 +191,37 @@ def apply_theme() -> None:
             border-radius: 8px;
             padding: 1rem;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(150px, 1fr));
+            gap: .8rem;
+            margin: 1rem 0;
+        }
+        .module-card {
+            background: #ffffff;
+            border: 1px solid #d7e2eb;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 112px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        }
+        .module-card strong {
+            display: block;
+            margin-bottom: .35rem;
+            color: #0f172a;
+        }
+        .module-card span {
+            color: #64748b;
+            font-size: .88rem;
+        }
+        .footer {
+            margin-top: 2rem;
+            padding: 1rem 0 .4rem 0;
+            border-top: 1px solid #d7e2eb;
+            color: #64748b;
+            font-size: .78rem;
+            line-height: 1.45;
         }
         div[data-testid="stButton"] button,
         div[data-baseweb="select"],
@@ -366,8 +414,66 @@ def render_hero() -> None:
     )
 
 
-def selected_role() -> str:
+def home_page() -> None:
+    logo_src = logo_data_uri()
+    logo_markup = f'<img class="hero-logo" src="{logo_src}" alt="SERPS logo">' if logo_src else ""
+    modules = [
+        ("Enrolment", "Register candidates, capture consent, and complete guided facial enrolment."),
+        ("Candidate Profiles", "Search and inspect enrolled candidate records with role-aware visibility."),
+        ("Session Control", "Run mode selection, device checks, authentication, and session start gates."),
+        ("Test Player", "Demonstrate assessment delivery with proctoring-focused sample questions."),
+        ("Monitoring", "Generate structured demo events for visual, identity, and audio intelligence."),
+        ("Review", "Inspect explainable fused alerts and record human-supervised decisions."),
+        ("Reports", "Filter session data and export JSON evidence reports."),
+    ]
+    cards = "".join(f'<div class="module-card"><strong>{title}</strong><span>{body}</span></div>' for title, body in modules)
+    st.markdown(
+        f"""
+        <div class="hero">
+            <div class="hero-identity">
+                {logo_markup}
+                <div class="hero-copy">
+                    <span class="brand">SERPS</span>
+                    <h1>Secure Remote-Proctored Assessment Console</h1>
+                    <p>Secure Explainable Remote Proctoring System for identity assurance, multi-modal monitoring, event fusion, and human-supervised review.</p>
+                </div>
+            </div>
+        </div>
+        <div class="module-grid">{cards}</div>
+        <div class="notice">
+            Academic research prototype for MSc/MIT capstone demonstration. AI-generated alerts support human review and must not be treated as automatic misconduct decisions.
+        </div>
+        <div class="status-card">
+            <strong>Human-in-the-loop decision reminder</strong><br>
+            Detection modules generate evidence and explanations. Staff reviewers remain responsible for final review outcomes.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_footer() -> None:
+    st.markdown(
+        """
+        <div class="footer">
+            <strong>SERPS - Secure Explainable Remote Proctoring System</strong><br>
+            Miva Open University MIT Capstone Research Prototype<br>
+            AI-generated alerts support human review and must not be treated as automatic misconduct decisions.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def return_to_top() -> None:
+    st.markdown('<a href="#top">Return to Top</a>', unsafe_allow_html=True)
+
+
+def selected_role_and_page() -> tuple[str, str]:
     with st.sidebar:
+        slug_to_page = {slug: page_name for page_name, slug in PAGE_SLUGS.items()}
+        requested_page = str(st.query_params.get("page", "home"))
+        page = slug_to_page.get(requested_page, "Home")
         logo_src = logo_data_uri()
         if logo_src:
             st.markdown(
@@ -384,9 +490,16 @@ def selected_role() -> str:
             )
         else:
             st.title("Proctoring Control")
+        st.caption("Navigation")
+        for page_name in PAGES:
+            active_class = "font-weight: 800; color: #075a75;" if page == page_name else "color: #0f172a;"
+            st.markdown(
+                f'<a href="?page={PAGE_SLUGS[page_name]}" target="_self" style="display:block; padding:.42rem .2rem; text-decoration:none; {active_class}">{page_name}</a>',
+                unsafe_allow_html=True,
+            )
         role = st.selectbox("Role", [role.value for role in Role])
         st.caption("Prototype RBAC. Not enterprise authentication.")
-    return role
+    return role, page
 
 
 def candidate_management(role: str) -> None:
@@ -396,21 +509,46 @@ def candidate_management(role: str) -> None:
         return
 
     if "enrolment_step" not in st.session_state:
-        st.session_state.enrolment_step = "register"
+        st.session_state.enrolment_step = "dashboard"
     if "custom_fields" not in st.session_state:
         st.session_state.custom_fields = [{"label": "Custom Reference", "type": "Text", "applies_to": "Generic", "value": ""}]
     active_enrolment_candidate = st.session_state.get("enrolment_candidate_id")
     if st.session_state.enrolment_step == "profile" and not _candidate_face_complete(active_enrolment_candidate):
-        st.session_state.enrolment_step = "register"
+        st.session_state.enrolment_step = "dashboard"
 
-    render_enrolment_steps()
-    if st.session_state.enrolment_step == "register":
+    if st.session_state.enrolment_step == "dashboard":
+        enrolment_dashboard()
+    elif st.session_state.enrolment_step == "register":
+        render_enrolment_steps()
         registration_wizard(role)
     elif st.session_state.enrolment_step == "face":
+        render_enrolment_steps()
         guided_face_enrolment()
     else:
+        render_enrolment_steps()
         profile_candidate_id = st.session_state.get("profile_candidate_id") or st.session_state.get("enrolment_candidate_id")
         candidate_profile_browser(str(profile_candidate_id) if profile_candidate_id else None)
+    return_to_top()
+
+
+def enrolment_dashboard() -> None:
+    st.markdown("#### Enrolment Dashboard")
+    st.caption("Choose the next enrolment action. Candidate registration fields remain hidden until a new registration is started.")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("Register New Candidate", key="start_new_registration", use_container_width=True):
+            st.session_state.enrolment_step = "register"
+            st.session_state.pop("enrolment_candidate_id", None)
+            st.rerun()
+    with col2:
+        disabled = not list_candidates()
+        if st.button("Continue Face Capture", key="continue_face_capture", disabled=disabled, use_container_width=True):
+            st.session_state.enrolment_step = "face"
+            st.rerun()
+    with col3:
+        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not list_candidates(), use_container_width=True):
+            st.session_state.enrolment_step = "profile"
+            st.rerun()
 
 
 def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
@@ -456,15 +594,23 @@ def candidate_profiles_page(role: str) -> None:
         return
 
     search = st.text_input("Search candidate profiles", key=f"candidate_profiles_search_{role}", placeholder="Type name, Student ID, or Candidate ID")
+    if not search.strip():
+        st.info("Search by name, Student ID, Candidate ID, matric number, or registration number to display a profile.")
+        return
+
     visible_candidates = _filter_candidates(visible_candidates, search)
     if not visible_candidates:
         st.warning("No candidate profile matches your search.")
         return
 
     labels = [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in visible_candidates]
-    selected = st.selectbox("Candidate", labels, key=f"candidate_profiles_select_{role}")
+    selected = st.selectbox("Candidate", ["Select a candidate"] + labels, key=f"candidate_profiles_select_{role}")
+    if selected == "Select a candidate":
+        st.info("Select a candidate from the filtered result list to view details.")
+        return
     candidate_id = selected.split("(")[-1].rstrip(")")
     render_candidate_profile(candidate_id, include_images=role == Role.ADMIN.value)
+    return_to_top()
 
 
 def _filter_candidates(candidates: list[dict[str, object]], search: str) -> list[dict[str, object]]:
@@ -482,7 +628,11 @@ def _filter_candidates(candidates: list[dict[str, object]], search: str) -> list
 
 
 def render_enrolment_steps() -> None:
-    col_register, col_face, col_profile = st.columns(3)
+    col_dashboard, col_register, col_face, col_profile = st.columns(4)
+    with col_dashboard:
+        if st.button("Dashboard", type="primary" if st.session_state.enrolment_step == "dashboard" else "secondary"):
+            st.session_state.enrolment_step = "dashboard"
+            st.rerun()
     with col_register:
         if st.button("1. Registration + Consent", type="primary" if st.session_state.enrolment_step == "register" else "secondary"):
             st.session_state.enrolment_step = "register"
@@ -836,53 +986,153 @@ def session_control(role: str) -> str | None:
         st.warning("Register a candidate before starting a session.")
         return None
 
-    st.markdown("#### 1. Select Candidate")
-    with st.container(border=True):
-        candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
-        selected = st.selectbox("Candidate", list(candidate_options), key="session_candidate_select")
-        candidate = candidate_options[selected]
-        candidate_id = str(candidate["candidate_id"])
-        candidate_profile_summary(candidate_id)
+    if "session_wizard_step" not in st.session_state:
+        st.session_state.session_wizard_step = 1
+    step = int(st.session_state.session_wizard_step)
 
-    st.markdown("#### 2. Select Monitoring Mode")
+    candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
+    candidate_id = st.session_state.get("session_candidate_id")
+    candidate = next((c for c in candidates if str(c["candidate_id"]) == str(candidate_id)), None)
+    mode = st.session_state.get("session_monitoring_mode_value")
+    if mode not in {"A", "B", "C"}:
+        mode = None
+
+    if step > 1 and candidate:
+        render_wizard_summary("1. Candidate", f"{candidate['full_name']} ({candidate['candidate_id']})", 1)
+    if step == 1:
+        st.markdown("#### 1. Select Candidate")
+        with st.container(border=True):
+            labels = list(candidate_options)
+            default_label = next((label for label in labels if candidate_id and str(candidate_id) in label), labels[0])
+            selected = st.selectbox("Candidate", labels, index=labels.index(default_label), key="session_candidate_select")
+            candidate = candidate_options[selected]
+            candidate_id = str(candidate["candidate_id"])
+            candidate_profile_summary(candidate_id)
+            if st.button("Continue to monitoring mode", key="wizard_candidate_next"):
+                st.session_state.session_candidate_id = candidate_id
+                st.session_state.session_wizard_step = 2
+                st.rerun()
+        session_management_panel(role)
+        render_audit_trail_panel()
+        return st.session_state.get("active_session_id")
+
+    if not candidate:
+        st.session_state.session_wizard_step = 1
+        st.rerun()
+
     mode_options = {
         "Mode B - dual-camera full mode": "B",
         "Mode A - single-camera CBT mode": "A",
         "Mode C - mirror-assisted low-resource mode": "C",
     }
-    with st.container(border=True):
-        selected_mode_label = st.selectbox("Monitoring mode", list(mode_options), key="session_monitoring_mode")
-        mode = mode_options[selected_mode_label]
-        plan = MonitoringModeController().configure(mode)
-        render_monitoring_mode_card(plan)
+    if step > 2 and mode:
+        render_wizard_summary("2. Monitoring Mode", f"Mode {mode}", 2)
+    if step == 2:
+        st.markdown("#### 2. Select Monitoring Mode")
+        with st.container(border=True):
+            default_label = next((label for label, value in mode_options.items() if value == mode), "Mode B - dual-camera full mode")
+            selected_mode_label = st.selectbox("Monitoring mode", list(mode_options), index=list(mode_options).index(default_label), key="session_monitoring_mode")
+            mode = mode_options[selected_mode_label]
+            plan = MonitoringModeController().configure(mode)
+            render_monitoring_mode_card(plan)
+            col_back, col_next = st.columns(2)
+            with col_back:
+                if st.button("Back to candidate", key="wizard_mode_back"):
+                    st.session_state.session_wizard_step = 1
+                    st.rerun()
+            with col_next:
+                if st.button("Continue to pre-exam checks", key="wizard_mode_next"):
+                    st.session_state.session_monitoring_mode_value = mode
+                    st.session_state.session_wizard_step = 3
+                    st.rerun()
+        session_management_panel(role)
+        render_audit_trail_panel()
+        return st.session_state.get("active_session_id")
 
-    st.markdown("#### 3. Run Pre-Exam Device and Environment Check")
-    device_ready = pre_exam_device_check_panel(role, candidate_id, mode)
+    if not mode:
+        st.session_state.session_wizard_step = 2
+        st.rerun()
 
-    st.markdown("#### 4. Authenticate Candidate")
-    authenticate_candidate_panel(role, candidate)
+    latest_check = latest_device_check(str(candidate["candidate_id"]), mode)
+    device_ready = device_check_allows_session_start(latest_check)
+    if step > 3:
+        status = "Passed" if device_ready else "Pending"
+        render_wizard_summary("3. Pre-Exam Check", f"{status} for Mode {mode}", 3)
+    if step == 3:
+        st.markdown("#### 3. Run Pre-Exam Device and Environment Check")
+        device_ready = pre_exam_device_check_panel(role, str(candidate["candidate_id"]), mode)
+        col_back, col_next = st.columns(2)
+        with col_back:
+            if st.button("Back to monitoring mode", key="wizard_checks_back"):
+                st.session_state.session_wizard_step = 2
+                st.rerun()
+        with col_next:
+            if st.button("Continue to authentication", key="wizard_checks_next", disabled=not device_ready):
+                st.session_state.session_wizard_step = 4
+                st.rerun()
+        session_management_panel(role)
+        render_audit_trail_panel()
+        return st.session_state.get("active_session_id")
 
-    authenticated = st.session_state.get("authenticated_candidate_id") == candidate_id
-    can_start = authenticated and device_ready
+    authenticated = st.session_state.get("authenticated_candidate_id") == str(candidate["candidate_id"])
+    if step > 4:
+        render_wizard_summary("4. Authentication", "Passed" if authenticated else "Pending", 4)
+    if step == 4:
+        st.markdown("#### 4. Authenticate Candidate")
+        authenticate_candidate_panel(role, candidate)
+        authenticated = st.session_state.get("authenticated_candidate_id") == str(candidate["candidate_id"])
+        col_back, col_next = st.columns(2)
+        with col_back:
+            if st.button("Back to pre-exam checks", key="wizard_auth_back"):
+                st.session_state.session_wizard_step = 3
+                st.rerun()
+        with col_next:
+            if st.button("Continue to session start", key="wizard_auth_next", disabled=not authenticated):
+                st.session_state.session_wizard_step = 5
+                st.rerun()
+        session_management_panel(role)
+        render_audit_trail_panel()
+        return st.session_state.get("active_session_id")
 
     st.markdown("#### 5. Start Prototype Session")
     with st.container(border=True):
         render_start_gate_status(authenticated, device_ready)
-        if can_start and has_permission(role, "start_session"):
-            if st.button("Start prototype session", key=f"start_session_{candidate_id}_{mode}"):
-                log_audit(role, "session_start_approved", candidate_id, f"monitoring_mode={mode}")
-                session_id = start_session(candidate_id, candidate_id, mode)
-                log_audit(role, "session_started", session_id, f"candidate_id={candidate_id}; monitoring_mode={mode}")
+        if authenticated and device_ready and has_permission(role, "start_session"):
+            if st.button("Start prototype session", key=f"start_session_{candidate['candidate_id']}_{mode}"):
+                log_audit(role, "session_start_approved", str(candidate["candidate_id"]), f"monitoring_mode={mode}")
+                session_id = start_session(str(candidate["candidate_id"]), str(candidate["candidate_id"]), mode)
+                log_audit(role, "session_started", session_id, f"candidate_id={candidate['candidate_id']}; monitoring_mode={mode}")
                 st.session_state.active_session_id = session_id
-                st.session_state.active_candidate_id = candidate_id
+                st.session_state.active_candidate_id = str(candidate["candidate_id"])
                 st.success(f"Started session {session_id}")
                 st.rerun()
-        elif not can_start:
-            st.info("Session start appears here after authentication and pre-exam checks are satisfied, or valid overrides are recorded.")
+        else:
+            st.info("Session start is locked until authentication and pre-exam checks are satisfied, or valid overrides are recorded.")
+    col_back, col_reset = st.columns(2)
+    with col_back:
+        if st.button("Back to authentication", key="wizard_start_back"):
+            st.session_state.session_wizard_step = 4
+            st.rerun()
+    with col_reset:
+        if st.button("Start another session workflow", key="wizard_start_reset"):
+            st.session_state.session_wizard_step = 1
+            st.rerun()
 
     selected_session_id = session_management_panel(role)
     render_audit_trail_panel()
     return selected_session_id
+
+
+def render_wizard_summary(title: str, value: str, step_number: int) -> None:
+    with st.container(border=True):
+        col_text, col_action = st.columns([3, 1])
+        with col_text:
+            st.markdown(f"**{title}**")
+            st.caption(value)
+        with col_action:
+            if st.button("Edit", key=f"edit_session_step_{step_number}"):
+                st.session_state.session_wizard_step = step_number
+                st.rerun()
 
 
 def render_monitoring_mode_card(plan) -> None:
@@ -1264,6 +1514,7 @@ def mock_test_player() -> None:
     if submitted:
         result = grade_answers(answers, questions)
         st.success(f"Score: {result['correct']}/{result['total']} ({result['percentage']}%)")
+    return_to_top()
 
 
 def monitoring_panel(role: str, session_id: str | None) -> None:
@@ -1298,6 +1549,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     events = list_events(session_id)
     if events:
         st.dataframe(pd.DataFrame(events), use_container_width=True)
+    return_to_top()
 
 
 def alert_review_panel(role: str, session_id: str | None) -> None:
@@ -1322,41 +1574,126 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
             st.success("Reviewer decision recorded.")
     else:
         st.info("Only Admin or Reviewer roles can submit final alert decisions.")
+    return_to_top()
 
 
 def reports_panel(role: str, session_id: str | None) -> None:
+    st.markdown('<span id="top"></span>', unsafe_allow_html=True)
     st.subheader("Reports")
-    if not session_id:
-        st.info("Select a session to export a report.")
-        return
-    if has_permission(role, "export_reports") and st.button("Export JSON session report"):
-        path = export_session_report_json(session_id)
+    sessions = list_sessions()
+    events = list_events()
+    alerts = list_alerts()
+    candidates = list_candidates()
+
+    with st.container(border=True):
+        st.write("Smart filters")
+        candidate_labels = ["All candidates"] + [f"{candidate['full_name']} ({candidate['candidate_id']})" for candidate in candidates]
+        selected_candidate = st.selectbox("Candidate", candidate_labels, key="report_candidate_filter")
+        session_labels = ["All sessions"] + [f"{session['session_id']} - {session['candidate_id']} - {session['session_status']}" for session in sessions]
+        default_session_index = 0
+        if session_id:
+            for index, label in enumerate(session_labels):
+                if str(session_id) in label:
+                    default_session_index = index
+                    break
+        selected_session = st.selectbox("Session", session_labels, index=default_session_index, key="report_session_filter")
+        col1, col2 = st.columns(2)
+        with col1:
+            risk_levels = ["All risk levels"] + sorted({str(alert["risk_level"]) for alert in alerts if alert.get("risk_level")})
+            selected_risk = st.selectbox("Risk level", risk_levels, key="report_risk_filter")
+            event_types = ["All event types"] + sorted({str(event["event_type"]) for event in events if event.get("event_type")})
+            selected_event_type = st.selectbox("Event type", event_types, key="report_event_type_filter")
+        with col2:
+            review_statuses = ["All review statuses"] + sorted({str(alert["review_status"]) for alert in alerts if alert.get("review_status")})
+            selected_review = st.selectbox("Review status", review_statuses, key="report_review_filter")
+            date_range = st.date_input("Date range", value=(), key="report_date_filter")
+
+    selected_candidate_id = None if selected_candidate == "All candidates" else selected_candidate.split("(")[-1].rstrip(")")
+    selected_session_id = None if selected_session == "All sessions" else selected_session.split(" - ")[0]
+
+    filtered_events = filter_report_rows(events, selected_candidate_id, selected_session_id, selected_event_type, None, date_range, "timestamp")
+    filtered_alerts = filter_report_rows(alerts, selected_candidate_id, selected_session_id, None, selected_risk, date_range, "start_time")
+    if selected_review != "All review statuses":
+        filtered_alerts = [alert for alert in filtered_alerts if str(alert.get("review_status")) == selected_review]
+
+    st.write("Filtered events")
+    if filtered_events:
+        st.dataframe(pd.DataFrame(filtered_events), use_container_width=True)
+    else:
+        st.info("No events match the selected filters.")
+
+    st.write("Filtered alerts")
+    if filtered_alerts:
+        st.dataframe(pd.DataFrame(filtered_alerts), use_container_width=True)
+    else:
+        st.info("No alerts match the selected filters.")
+
+    export_session_id = selected_session_id or session_id
+    if export_session_id and has_permission(role, "export_reports") and st.button("Export selected session JSON report"):
+        path = export_session_report_json(export_session_id)
         st.success(f"Report exported to {path}")
+    elif not export_session_id:
+        st.caption("Select a specific session to export a JSON session report.")
     else:
         st.caption("Report export is available to Admin and Reviewer roles.")
+    return_to_top()
+
+
+def filter_report_rows(
+    rows: list[dict[str, object]],
+    candidate_id: str | None,
+    session_id: str | None,
+    event_type: str | None,
+    risk_level: str | None,
+    date_range: object,
+    date_field: str,
+) -> list[dict[str, object]]:
+    filtered = rows
+    if candidate_id:
+        filtered = [row for row in filtered if str(row.get("candidate_id")) == candidate_id]
+    if session_id:
+        filtered = [row for row in filtered if str(row.get("session_id")) == session_id]
+    if event_type and event_type != "All event types":
+        filtered = [row for row in filtered if str(row.get("event_type")) == event_type]
+    if risk_level and risk_level != "All risk levels":
+        filtered = [row for row in filtered if str(row.get("risk_level")) == risk_level]
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+        filtered = [
+            row
+            for row in filtered
+            if row.get(date_field)
+            and start_date.isoformat() <= str(row.get(date_field))[:10] <= end_date.isoformat()
+        ]
+    return filtered
 
 
 def main() -> None:
     apply_theme()
-    role = selected_role()
-    render_hero()
+    st.markdown('<span id="top"></span>', unsafe_allow_html=True)
+    role, page = selected_role_and_page()
+    if page == "Home":
+        home_page()
+        render_footer()
+        return
 
-    tabs = st.tabs(["Enrolment", "Candidate Profiles", "Session", "Test Player", "Monitoring", "Review", "Reports"])
-    with tabs[0]:
+    render_hero()
+    if page == "Enrolment":
         candidate_management(role)
-    with tabs[1]:
+    elif page == "Candidate Profiles":
         candidate_profiles_page(role)
-    with tabs[2]:
-        session_id = session_control(role)
-    with tabs[3]:
+    elif page == "Session":
+        session_control(role)
+    elif page == "Test Player":
         mock_test_player()
     session_id = st.session_state.get("active_session_id")
-    with tabs[4]:
+    if page == "Monitoring":
         monitoring_panel(role, session_id)
-    with tabs[5]:
+    elif page == "Review":
         alert_review_panel(role, session_id)
-    with tabs[6]:
+    elif page == "Reports":
         reports_panel(role, session_id)
+    render_footer()
 
 
 if __name__ == "__main__":
