@@ -34,10 +34,43 @@
 - Added a subtle SERPS footer across application pages.
 - Expanded the prototype test player to 15 questions covering remote proctoring, event fusion, explainable AI, identity assurance, privacy-aware monitoring, and human review.
 
+## Enrolment Integrity and Access-Model Refinement
+
+- Added repository-level validation for candidate/student identifiers, email address format, Miva matric number, and WAEC registration number before SQLite insertion.
+- Added clean duplicate-handling paths so existing candidates can be viewed or pending face capture can be continued instead of exposing raw SQLite tracebacks.
+- Added draft biodata support with status progression: `draft`, `registered_pending_face_capture`, `face_enrolled`, and `authenticated`.
+- Kept guided face capture locked until a persisted candidate record exists and registration/consent has moved past draft state.
+- Added profile review details for biodata, institution-specific identifiers, address, consent status, face-capture direction labels, quality scores, and image previews.
+- Added a controlled biodata edit panel that updates demographic and institution metadata without touching enrolled face samples.
+- Added a prototype duplicate-face guard by comparing new capture embeddings against existing saved enrolment templates. This is suitable for demonstration only, not a production biometric identity service.
+- Relabelled the sidebar role control as a Prototype Role Simulator and documented that production staff roles would come from secure login while candidates would not use the SERPS dashboard.
+- Made the footer clearer and centred while preserving the academic prototype tone.
+
+## Load-Time Optimisation Notes
+
+- The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.
+- Heavier face-processing imports are lazy-loaded behind camera/authentication/capture actions instead of being imported during page load.
+- Large tables are not rendered on the Home page, and Candidate Profiles show the list first while full profile evidence waits for explicit selection.
+- Streamlit still reruns the script after widget interaction; a production implementation should add server-side pagination and dedicated API endpoints as records grow.
+
+## Viva Demonstration Flow
+
+1. Panel/member acts as Admin or Human Proctor in the SERPS dashboard.
+2. Candidate profile is enrolled with biodata, consent, and face samples.
+3. Candidate authenticates before session start.
+4. Candidate starts the mock assessment.
+5. Monitoring module generates normal and suspicious visual/audio/identity events.
+6. Event Fusion Engine generates explainable fused alerts.
+7. Agentic AI orchestration foundation prioritises and routes alert actions.
+8. Human reviewer accepts, rejects, or escalates.
+9. Report is generated for the session.
+
 ## Prototype Limitations
 
 - Face recognition, voice verification, camera feeds, and YOLO detection are represented by prototype/demo event flows at this stage.
 - Streamlit supports browser camera capture through `st.camera_input`, but the app keeps camera activation user-triggered for privacy. Streamlit does not provide an equivalent built-in microphone probe, so microphone readiness is recorded as a manual prototype confirmation.
+- Streamlit's browser camera input is not designed for continuous AI-guided pose tracking and automatic capture. The future path is `streamlit-webrtc`, FastAPI/WebSocket + OpenCV backend streaming, or a dedicated React/WebRTC frontend for continuous landmark inspection, left/right/up/down/centre pose validation, auto-capture, and automatic progression to the next direction.
 - Streamlit has limited native page-routing and wizard primitives. The prototype uses sidebar navigation, session state, and collapsed summary panels to approximate routed pages and wizard progression.
 - The test player is intentionally lightweight and is not a production examination engine.
 - RBAC is local prototype authorization, not enterprise identity management.
+- Monitoring remains a prototype module. Future work should add single-candidate view, grouped candidate/session view, multiple session analytics, visual dashboards, flagged candidate classification, event distribution, risk summary, reviewer/proctor queue, and Agentic AI prioritisation of infringements.

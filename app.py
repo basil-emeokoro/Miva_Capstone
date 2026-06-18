@@ -9,7 +9,6 @@ import streamlit as st
 import numpy as np
 
 from src.audio.audio_event_detector import create_background_speech_event
-from src.enrolment.auto_capture import ai_auto_capture
 from src.enrolment.consent_manager import CONSENT_NOTICE, capture_consent
 from src.enrolment.face_enrolment import (
     FACE_DIRECTIONS,
@@ -18,7 +17,6 @@ from src.enrolment.face_enrolment import (
     list_face_samples,
     record_face_sample,
 )
-from src.authentication.face_verifier import verify_face_against_enrolment
 from src.fusion.fusion_engine import FusionEngine
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
@@ -29,17 +27,21 @@ from src.session.exam_controller import grade_answers, load_sample_questions
 from src.session.monitoring_mode_controller import MonitoringModeController
 from src.session.session_manager import end_session, list_sessions, start_session
 from src.storage.candidate_repository import (
+    CandidateDuplicateError,
+    default_email_for_institution,
+    generate_candidate_id,
+    get_candidate,
     list_candidate_custom_fields,
     list_candidates,
     register_candidate,
     save_candidate_custom_fields,
+    update_candidate_biodata,
 )
-from src.storage.database import initialize_database
+from src.storage.database import fetch_all, initialize_database
 from src.storage.device_check_repository import latest_device_check, save_device_check
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
 from src.utils.geodata import COUNTRIES, NIGERIA_LGAS, NIGERIA_STATES
-from src.vision.face_quality import assess_face_capture, extract_face_embedding, mirror_image_bytes
 from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
 
 
@@ -75,6 +77,39 @@ def logo_data_uri() -> str:
         return ""
     encoded = base64.b64encode(SERPS_LOGO_PATH.read_bytes()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_candidates() -> list[dict[str, object]]:
+    return list_candidates()
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_sessions() -> list[dict[str, object]]:
+    return list_sessions()
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_events(session_id: str | None = None) -> list[dict[str, object]]:
+    return list_events(session_id)
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_alerts(session_id: str | None = None) -> list[dict[str, object]]:
+    return list_alerts(session_id)
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_audit_logs(limit: int = 30) -> list[dict[str, object]]:
+    return list_recent_audit_logs(limit)
+
+
+def clear_app_caches() -> None:
+    cached_candidates.clear()
+    cached_sessions.clear()
+    cached_events.clear()
+    cached_alerts.clear()
+    cached_audit_logs.clear()
 
 
 def apply_theme() -> None:
@@ -216,12 +251,14 @@ def apply_theme() -> None:
             font-size: .88rem;
         }
         .footer {
-            margin-top: 2rem;
-            padding: 1rem 0 .4rem 0;
-            border-top: 1px solid #d7e2eb;
-            color: #64748b;
-            font-size: .78rem;
-            line-height: 1.45;
+            margin-top: 2.4rem;
+            padding: 1.15rem 0 .8rem 0;
+            border-top: 1px solid #b8d5df;
+            color: #31566a;
+            font-size: .86rem;
+            line-height: 1.55;
+            text-align: center;
+            font-weight: 500;
         }
         div[data-testid="stButton"] button,
         div[data-baseweb="select"],
@@ -497,8 +534,11 @@ def selected_role_and_page() -> tuple[str, str]:
                 f'<a href="?page={PAGE_SLUGS[page_name]}" target="_self" style="display:block; padding:.42rem .2rem; text-decoration:none; {active_class}">{page_name}</a>',
                 unsafe_allow_html=True,
             )
-        role = st.selectbox("Role", [role.value for role in Role])
-        st.caption("Prototype RBAC. Not enterprise authentication.")
+        role = st.selectbox("Prototype Role Simulator", [role.value for role in Role])
+        st.caption(
+            "In production, roles would be assigned after secure staff login. "
+            "Candidates would not access the SERPS dashboard."
+        )
     return role, page
 
 
@@ -541,18 +581,18 @@ def enrolment_dashboard() -> None:
             st.session_state.pop("enrolment_candidate_id", None)
             st.rerun()
     with col2:
-        disabled = not list_candidates()
+        disabled = not cached_candidates()
         if st.button("Continue Face Capture", key="continue_face_capture", disabled=disabled, use_container_width=True):
             st.session_state.enrolment_step = "face"
             st.rerun()
     with col3:
-        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not list_candidates(), use_container_width=True):
+        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not cached_candidates(), use_container_width=True):
             st.session_state.enrolment_step = "profile"
             st.rerun()
 
 
 def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
-    candidates = list_candidates()
+    candidates = cached_candidates()
     st.markdown("#### Enrolled candidates")
     if not candidates:
         st.info("No enrolled candidates are available yet.")
@@ -571,12 +611,12 @@ def candidate_profile_browser(default_candidate_id: str | None = None) -> None:
                 break
     selected = st.selectbox("Select candidate profile", labels, index=default_index, key="enrolment_profile_select")
     candidate_id = selected.split("(")[-1].rstrip(")")
-    render_candidate_profile(candidate_id)
+    render_candidate_profile(candidate_id, include_images=True, allow_biodata_edit=True)
 
 
 def candidate_profiles_page(role: str) -> None:
     st.subheader("Candidate Profiles")
-    candidates = list_candidates()
+    candidates = cached_candidates()
     if not candidates:
         st.info("No candidate profiles are available yet.")
         return
@@ -592,6 +632,20 @@ def candidate_profiles_page(role: str) -> None:
     if not visible_candidates:
         st.warning("No assigned candidate profile is available for this role yet.")
         return
+
+    st.write("Enrolled candidate list")
+    list_rows = [
+        {
+            "Candidate": candidate.get("full_name"),
+            "Identifier": candidate.get("candidate_id"),
+            "Institution": candidate.get("institution"),
+            "Profile": candidate.get("institution_type"),
+            "Status": candidate.get("enrolment_status"),
+            "Created": candidate.get("created_at"),
+        }
+        for candidate in visible_candidates
+    ]
+    st.dataframe(pd.DataFrame(list_rows), use_container_width=True, hide_index=True)
 
     search = st.text_input("Search candidate profiles", key=f"candidate_profiles_search_{role}", placeholder="Type name, Student ID, or Candidate ID")
     if not search.strip():
@@ -691,6 +745,8 @@ def registration_wizard(role: str) -> None:
         key="registration_institution_type",
     )
     st.caption("Changing this selection immediately filters the registration fields below.")
+    suggested_candidate_id = generate_candidate_id(institution_type)
+    suggested_email = default_email_for_institution(institution_type)
 
     country_index = COUNTRIES.index("Nigeria") if "Nigeria" in COUNTRIES else 0
     country = st.selectbox("Country", COUNTRIES, index=country_index, key="registration_country")
@@ -709,7 +765,7 @@ def registration_wizard(role: str) -> None:
         full_name = st.text_input("Full name", "Demo Candidate")
         if institution_type == "WAEC":
             institution = st.text_input("Institution", "WAEC")
-            candidate_identifier = st.text_input("Candidate ID (10 digits)", "1234567001")
+            candidate_identifier = st.text_input("Candidate ID (10 digits)", suggested_candidate_id, key="waec_candidate_identifier")
             st.caption("WAEC Candidate ID = 7-digit centre number + 3-digit candidate number.")
             waec_registration_number = st.text_input("Candidate Registration Number", "WAEC/REG/2026-A1")
             matric_number = ""
@@ -717,19 +773,19 @@ def registration_wizard(role: str) -> None:
             department = ""
         elif institution_type == "Miva":
             institution = st.text_input("Institution", "Miva Open University")
-            candidate_identifier = st.text_input("Student ID (digits only)", "10000001")
+            candidate_identifier = st.text_input("Student ID (digits only)", suggested_candidate_id, key="miva_candidate_identifier")
             matric_number = st.text_input("Matric Number", "MIVA/CSC/2026/001")
             programme = st.selectbox("Programme", ["Undergraduate", "Postgraduate"], key="miva_programme")
             department = st.text_input("Department", "Computer Science")
             waec_registration_number = ""
         else:
             institution = st.text_input("Institution", "Demo Institution")
-            candidate_identifier = st.text_input("Candidate ID", "CAND-DEMO-001")
+            candidate_identifier = st.text_input("Candidate ID", suggested_candidate_id, key="generic_candidate_identifier")
             waec_registration_number = ""
             matric_number = ""
             programme = ""
             department = ""
-        email = st.text_input("Email", "candidate@example.com")
+        email = st.text_input("Email", suggested_email, key=f"registration_email_{institution_type}")
         gender = st.selectbox("Gender", ["Female", "Male", "Other", "Prefer not to say"], key="registration_gender")
         date_of_birth = st.date_input("Date of birth", value=None)
         st.markdown("Address")
@@ -748,10 +804,17 @@ def registration_wizard(role: str) -> None:
             if label and applies_to in {"All", institution_type}:
                 custom_values[label] = render_custom_field_input(label, field.get("type", "Text"), index)
         consent = st.checkbox(CONSENT_NOTICE)
-        submitted = st.form_submit_button("Register candidate and continue")
+        col_draft, col_submit = st.columns(2)
+        with col_draft:
+            draft_submitted = st.form_submit_button("Save biodata as draft")
+        with col_submit:
+            submitted = st.form_submit_button("Register candidate and continue")
 
-    if submitted:
-        if not consent:
+    if draft_submitted or submitted:
+        if not full_name.strip():
+            st.error("Full name is required.")
+            return
+        if submitted and not consent:
             st.error("Consent is required before enrolment.")
             return
         try:
@@ -770,16 +833,41 @@ def registration_wizard(role: str) -> None:
                 local_government_area=local_government_area,
                 postal_code=postal_code,
                 street_address=street_address,
+                enrolment_status="registered_pending_face_capture" if submitted else "draft",
             )
+        except CandidateDuplicateError as exc:
+            st.warning(str(exc))
+            existing_id = exc.existing_candidate_id
+            col_existing, col_face, col_edit = st.columns(3)
+            with col_existing:
+                if st.button("View existing candidate", key=f"view_duplicate_{existing_id}"):
+                    st.session_state.profile_candidate_id = existing_id
+                    st.session_state.enrolment_candidate_id = existing_id
+                    st.session_state.enrolment_step = "profile"
+                    st.rerun()
+            with col_face:
+                existing = get_candidate(existing_id)
+                can_continue = existing and existing.get("enrolment_status") in {"registered_pending_face_capture", "face_enrolled"}
+                if st.button("Continue pending face capture", key=f"continue_duplicate_{existing_id}", disabled=not can_continue):
+                    st.session_state.enrolment_candidate_id = existing_id
+                    st.session_state.enrolment_step = "face"
+                    st.rerun()
+            with col_edit:
+                st.caption("Draft editing is available from the candidate profile review panel.")
+            return
         except ValueError as exc:
             st.error(str(exc))
             return
         save_candidate_custom_fields(candidate_id, custom_values)
-        capture_consent(candidate_id)
+        if submitted:
+            capture_consent(candidate_id)
+        clear_app_caches()
         st.session_state.enrolment_candidate_id = candidate_id
-        st.session_state.enrolment_step = "face"
-        st.success(f"Candidate registered: {candidate_id}. Proceeding to guided face capture.")
-        st.rerun()
+        if submitted:
+            st.session_state.enrolment_step = "face"
+            st.success(f"Candidate registered: {candidate_id}. Proceeding to guided face capture.")
+            st.rerun()
+        st.success(f"Draft biodata saved for {candidate_id}. Register the candidate when ready to start guided face capture.")
 
 
 def render_custom_field_input(label: str, data_type: str, index: int) -> str:
@@ -797,7 +885,7 @@ def render_custom_field_input(label: str, data_type: str, index: int) -> str:
 
 
 def guided_face_enrolment() -> None:
-    candidates = list_candidates()
+    candidates = cached_candidates()
     st.markdown("#### Guided facial enrolment")
     st.caption("AI validation checks that a single face is visible before each sample is saved.")
     if not candidates:
@@ -819,6 +907,12 @@ def guided_face_enrolment() -> None:
     selected = st.selectbox("Candidate for face capture", labels, index=default_index, key="face_capture_candidate_select")
     candidate = candidate_options[selected]
     candidate_id = str(candidate["candidate_id"])
+    if candidate.get("enrolment_status") == "draft":
+        st.warning("This candidate is still a draft. Complete registration and consent before starting guided face capture.")
+        if st.button("Back to registration"):
+            st.session_state.enrolment_step = "register"
+            st.rerun()
+        return
     done = captured_directions(candidate_id)
     progress = len(done) / len(FACE_DIRECTIONS)
     st.progress(progress, text=f"{len(done)} of {len(FACE_DIRECTIONS)} directions captured")
@@ -854,6 +948,8 @@ def guided_face_enrolment() -> None:
     with ai_col:
         if st.button("AI auto-capture valid frame"):
             with st.spinner("Watching webcam for a valid face frame..."):
+                from src.enrolment.auto_capture import ai_auto_capture
+
                 result = ai_auto_capture(direction=direction)
             if result["accepted"] and result["image_bytes"]:
                 process_face_capture(candidate_id, direction, direction_label, bytes(result["image_bytes"]))
@@ -903,6 +999,8 @@ def guided_face_enrolment() -> None:
     if image:
         image_bytes = image.getvalue()
         if fix_mirror:
+            from src.vision.face_quality import mirror_image_bytes
+
             image_bytes = mirror_image_bytes(image_bytes)
         process_face_capture(candidate_id, direction, direction_label, image_bytes)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -919,15 +1017,24 @@ def process_face_capture(candidate_id: str, direction: str, direction_label: str
         st.info("This capture has already been processed. Clear photo to retake or wait for the next direction.")
         return
 
+    from src.vision.face_quality import assess_face_capture, extract_face_embedding
+
     assessment = assess_face_capture(image_bytes, direction)
     if not assessment["accepted"]:
         st.error(str(assessment["message"]))
         return
 
+    embedding = extract_face_embedding(image_bytes, direction)
+    duplicate_face = find_similar_face_candidate(candidate_id, embedding)
+    if duplicate_face:
+        st.error(
+            f"Prototype duplicate-face check found a possible match with {duplicate_face['candidate_id']} "
+            f"(similarity {duplicate_face['similarity']:.3f}). Review the existing profile before accepting this enrolment."
+        )
+        return
     file_path = candidate_enrolment_dir(candidate_id) / f"{direction}.jpg"
     embedding_path = candidate_enrolment_dir(candidate_id) / f"{direction}_embedding.npy"
     write_bytes(file_path, image_bytes)
-    embedding = extract_face_embedding(image_bytes, direction)
     np.save(embedding_path, embedding)
     record_face_sample(
         candidate_id,
@@ -941,10 +1048,37 @@ def process_face_capture(candidate_id: str, direction: str, direction_label: str
         from src.storage.candidate_repository import update_enrolment_status
 
         update_enrolment_status(candidate_id, "face_enrolled")
+        clear_app_caches()
         st.success("Accepted and saved. Guided facial enrolment is complete.")
     else:
         st.success(f"Accepted and saved {direction_label}. Loading the next capture...")
     st.rerun()
+
+
+def find_similar_face_candidate(candidate_id: str, embedding: np.ndarray, threshold: float = 0.995) -> dict[str, object] | None:
+    for candidate in cached_candidates():
+        other_candidate_id = str(candidate["candidate_id"])
+        if other_candidate_id == candidate_id:
+            continue
+        for sample in list_face_samples(other_candidate_id):
+            embedding_path = sample.get("embedding_path")
+            if not embedding_path or not Path(str(embedding_path)).exists():
+                continue
+            try:
+                existing_embedding = np.load(str(embedding_path))
+            except (OSError, ValueError):
+                continue
+            denom = float(np.linalg.norm(embedding) * np.linalg.norm(existing_embedding))
+            if denom == 0:
+                continue
+            similarity = float(np.dot(embedding, existing_embedding) / denom)
+            if similarity >= threshold:
+                return {
+                    "candidate_id": other_candidate_id,
+                    "full_name": candidate.get("full_name"),
+                    "similarity": similarity,
+                }
+    return None
 
 
 def inject_capture_overlay(direction: str) -> None:
@@ -979,7 +1113,7 @@ def inject_capture_overlay(direction: str) -> None:
 
 
 def session_control(role: str) -> str | None:
-    candidates = list_candidates()
+    candidates = cached_candidates()
     st.subheader("Session Control")
     st.caption("Staff RBAC controls Admin, Human Proctor, and Reviewer access. Candidates are not RBAC users; they authenticate separately through their enrolment profile.")
     if not candidates:
@@ -1014,6 +1148,7 @@ def session_control(role: str) -> str | None:
                 st.rerun()
         session_management_panel(role)
         render_audit_trail_panel()
+        return_to_top()
         return st.session_state.get("active_session_id")
 
     if not candidate:
@@ -1047,6 +1182,7 @@ def session_control(role: str) -> str | None:
                     st.rerun()
         session_management_panel(role)
         render_audit_trail_panel()
+        return_to_top()
         return st.session_state.get("active_session_id")
 
     if not mode:
@@ -1072,6 +1208,7 @@ def session_control(role: str) -> str | None:
                 st.rerun()
         session_management_panel(role)
         render_audit_trail_panel()
+        return_to_top()
         return st.session_state.get("active_session_id")
 
     authenticated = st.session_state.get("authenticated_candidate_id") == str(candidate["candidate_id"])
@@ -1092,6 +1229,7 @@ def session_control(role: str) -> str | None:
                 st.rerun()
         session_management_panel(role)
         render_audit_trail_panel()
+        return_to_top()
         return st.session_state.get("active_session_id")
 
     st.markdown("#### 5. Start Prototype Session")
@@ -1104,6 +1242,7 @@ def session_control(role: str) -> str | None:
                 log_audit(role, "session_started", session_id, f"candidate_id={candidate['candidate_id']}; monitoring_mode={mode}")
                 st.session_state.active_session_id = session_id
                 st.session_state.active_candidate_id = str(candidate["candidate_id"])
+                clear_app_caches()
                 st.success(f"Started session {session_id}")
                 st.rerun()
         else:
@@ -1120,6 +1259,7 @@ def session_control(role: str) -> str | None:
 
     selected_session_id = session_management_panel(role)
     render_audit_trail_panel()
+    return_to_top()
     return selected_session_id
 
 
@@ -1216,6 +1356,7 @@ def pre_exam_device_check_panel(role: str, candidate_id: str, mode: str) -> bool
             evaluation = evaluate_device_checks(mode, values)
             check_id = save_device_check(candidate_id, evaluation, role)
             log_audit(role, "device_check_saved", check_id, f"candidate_id={candidate_id}; mode={mode}; status={evaluation.overall_status}")
+            clear_app_caches()
             st.success(f"Saved pre-exam check {check_id}: {evaluation.overall_status}.")
             st.rerun()
 
@@ -1229,6 +1370,7 @@ def pre_exam_device_check_panel(role: str, candidate_id: str, mode: str) -> bool
                 else:
                     check_id = save_device_check(candidate_id, evaluation, role, staff_override=True, override_reason=override_reason)
                     log_audit(role, "device_check_override", check_id, f"candidate_id={candidate_id}; mode={mode}; reason={override_reason.strip()}")
+                    clear_app_caches()
                     st.warning(f"Device-check override recorded: {check_id}.")
                     st.rerun()
 
@@ -1338,7 +1480,7 @@ def render_start_gate_status(authenticated: bool, device_ready: bool) -> None:
 
 
 def session_management_panel(role: str) -> str | None:
-    sessions = list_sessions()
+    sessions = cached_sessions()
     with st.expander("Active/reporting sessions", expanded=bool(sessions)):
         if not sessions:
             st.info("No sessions have been started yet.")
@@ -1358,6 +1500,7 @@ def session_management_panel(role: str) -> str | None:
             if st.button("End selected session", key=f"end_session_{session_id}"):
                 end_session(session_id)
                 log_audit(role, "session_ended", session_id, f"candidate_id={selected_session['candidate_id']}")
+                clear_app_caches()
                 st.success(f"Ended session {session_id}.")
                 st.rerun()
         return session_id
@@ -1365,7 +1508,7 @@ def session_management_panel(role: str) -> str | None:
 
 def render_audit_trail_panel() -> None:
     with st.expander("Recent audit trail", expanded=False):
-        logs = list_recent_audit_logs(30)
+        logs = cached_audit_logs(30)
         if not logs:
             st.info("No audit records found.")
             return
@@ -1377,8 +1520,8 @@ def candidate_profile_summary(candidate_id: str) -> None:
         render_candidate_profile(candidate_id)
 
 
-def render_candidate_profile(candidate_id: str, include_images: bool = False) -> None:
-    candidates = {str(candidate["candidate_id"]): candidate for candidate in list_candidates()}
+def render_candidate_profile(candidate_id: str, include_images: bool = False, allow_biodata_edit: bool = False) -> None:
+    candidates = {str(candidate["candidate_id"]): candidate for candidate in cached_candidates()}
     candidate = candidates.get(candidate_id)
     if not candidate:
         st.info("Candidate profile not found.")
@@ -1387,6 +1530,8 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False) ->
     samples = list_face_samples(candidate_id)
     custom_fields = list_candidate_custom_fields(candidate_id)
     captured = captured_directions(candidate_id)
+    consent_records = list_candidate_consent(candidate_id)
+    latest_consent = consent_records[0] if consent_records else None
     id_label = "Student ID" if candidate.get("institution_type") == "Miva" else "Candidate ID"
     st.markdown(
         f"""
@@ -1401,6 +1546,7 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False) ->
     )
     identifier_rows = [
         {"field": "Institution profile", "value": candidate.get("institution_type")},
+        {"field": "Email", "value": candidate.get("email")},
         {"field": "WAEC Registration Number", "value": candidate.get("waec_registration_number")},
         {"field": "WAEC Centre Number", "value": candidate.get("centre_number")},
         {"field": "WAEC Candidate Number", "value": candidate.get("candidate_number")},
@@ -1412,11 +1558,15 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False) ->
         {"field": "Local Government Area", "value": candidate.get("local_government_area")},
         {"field": "ZIP / Postal Code", "value": candidate.get("postal_code")},
         {"field": "Street Address", "value": candidate.get("street_address")},
+        {"field": "Consent status", "value": latest_consent.get("consent_status") if latest_consent else "Not captured"},
+        {"field": "Consent timestamp", "value": latest_consent.get("consent_timestamp") if latest_consent else ""},
     ]
     visible_identifier_rows = [row for row in identifier_rows if row["value"]]
     if visible_identifier_rows:
         st.write("Institutional and demographic details")
         st.dataframe(pd.DataFrame(visible_identifier_rows), use_container_width=True)
+    if allow_biodata_edit:
+        render_biodata_edit_form(candidate)
     st.progress(len(captured) / len(FACE_DIRECTIONS), text=f"{len(captured)} of {len(FACE_DIRECTIONS)} required face samples captured")
     if custom_fields:
         st.write("Custom fields")
@@ -1433,13 +1583,90 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False) ->
                 image_path = sample.get("image_path")
                 if image_path:
                     with cols[index % 3]:
-                        st.image(str(image_path), caption=str(sample["capture_direction"]), use_container_width=True)
+                        st.image(
+                            str(image_path),
+                            caption=f"{sample['capture_direction']} | quality {float(sample['quality_score']):.2f}",
+                            use_container_width=True,
+                        )
+
+
+def list_candidate_consent(candidate_id: str) -> list[dict[str, object]]:
+    rows = fetch_all(
+        """
+        SELECT * FROM consent
+        WHERE candidate_id = ?
+        ORDER BY consent_timestamp DESC
+        """,
+        (candidate_id,),
+    )
+    return [dict(row) for row in rows]
+
+
+def render_biodata_edit_form(candidate: dict[str, object]) -> None:
+    with st.expander("Review and edit biodata", expanded=False):
+        st.caption("This updates biodata and institution metadata only. Face recapture remains a separate controlled action.")
+        candidate_id = str(candidate["candidate_id"])
+        institution_type = str(candidate.get("institution_type") or "Generic")
+        with st.form(f"edit_biodata_{candidate_id}"):
+            full_name = st.text_input("Full name", str(candidate.get("full_name") or ""))
+            institution = st.text_input("Institution", str(candidate.get("institution") or ""))
+            email = st.text_input("Email", str(candidate.get("email") or default_email_for_institution(institution_type)))
+            if institution_type == "WAEC":
+                waec_registration_number = st.text_input(
+                    "WAEC Candidate Registration Number",
+                    str(candidate.get("waec_registration_number") or ""),
+                )
+                matric_number = None
+            elif institution_type == "Miva":
+                matric_number = st.text_input("Miva Matric Number", str(candidate.get("matric_number") or ""))
+                waec_registration_number = None
+            else:
+                matric_number = None
+                waec_registration_number = None
+            gender_options = ["Female", "Male", "Other", "Prefer not to say"]
+            current_gender = str(candidate.get("gender") or "Prefer not to say")
+            gender = st.selectbox(
+                "Gender",
+                gender_options,
+                index=gender_options.index(current_gender) if current_gender in gender_options else 3,
+                key=f"edit_gender_{candidate_id}",
+            )
+            date_of_birth = st.text_input("Date of birth", str(candidate.get("date_of_birth") or ""))
+            country = st.text_input("Country", str(candidate.get("country") or ""))
+            state = st.text_input("State / Region", str(candidate.get("state") or ""))
+            local_government_area = st.text_input("Local Government Area / Locality", str(candidate.get("local_government_area") or ""))
+            postal_code = st.text_input("ZIP / Postal code", str(candidate.get("postal_code") or ""))
+            street_address = st.text_area("Street address", str(candidate.get("street_address") or ""))
+            submitted = st.form_submit_button("Save biodata changes")
+        if submitted:
+            try:
+                update_candidate_biodata(
+                    candidate_id=candidate_id,
+                    full_name=full_name,
+                    institution=institution,
+                    email=email,
+                    waec_registration_number=waec_registration_number,
+                    matric_number=matric_number,
+                    gender=gender,
+                    date_of_birth=date_of_birth or None,
+                    country=country or None,
+                    state=state or None,
+                    local_government_area=local_government_area or None,
+                    postal_code=postal_code or None,
+                    street_address=street_address or None,
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+                return
+            clear_app_caches()
+            st.success("Biodata updated. Face samples were not changed.")
+            st.rerun()
 
 
 def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> None:
     candidate_id = str(candidate["candidate_id"])
     with st.expander("Candidate authentication", expanded=True):
-        if candidate.get("enrolment_status") != "face_enrolled":
+        if candidate.get("enrolment_status") not in {"face_enrolled", "authenticated"}:
             st.error("This candidate has not completed guided face enrolment.")
             return
 
@@ -1463,13 +1690,20 @@ def authenticate_candidate_panel(role: str, candidate: dict[str, object]) -> Non
             auth_image = st.camera_input("Authentication face capture", key=f"auth_{candidate_id}")
         if auth_image:
             try:
+                from src.authentication.face_verifier import verify_face_against_enrolment
+                from src.vision.face_quality import mirror_image_bytes
+
                 result = verify_face_against_enrolment(candidate_id, mirror_image_bytes(auth_image.getvalue()))
             except ValueError as exc:
                 st.error(str(exc))
                 return
             if result["matched"]:
+                from src.storage.candidate_repository import update_enrolment_status
+
                 st.session_state.authenticated_candidate_id = candidate_id
                 st.session_state[auth_state_key] = False
+                update_enrolment_status(candidate_id, "authenticated")
+                clear_app_caches()
                 log_audit(role, "authentication_passed", candidate_id, f"confidence={result['confidence']}")
                 st.success(f"Authenticated with confidence {result['confidence']}.")
             else:
@@ -1534,6 +1768,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
                 alert = st.session_state.fusion_engine.ingest(event)
                 if alert:
                     save_alert(alert)
+                clear_app_caches()
                 st.success("Structured event generated and fused.")
         with col2:
             if st.button("Generate background speech event"):
@@ -1542,11 +1777,12 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
                 alert = st.session_state.fusion_engine.ingest(event)
                 if alert:
                     save_alert(alert)
+                clear_app_caches()
                 st.success("Audio event generated and fused.")
     else:
         st.info("Your role cannot generate demo monitoring events.")
 
-    events = list_events(session_id)
+    events = cached_events(session_id)
     if events:
         st.dataframe(pd.DataFrame(events), use_container_width=True)
     return_to_top()
@@ -1558,7 +1794,7 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
         st.info("Select a session to review alerts.")
         return
 
-    alerts = list_alerts(session_id)
+    alerts = cached_alerts(session_id)
     if not alerts:
         st.info("No fused alerts yet.")
         return
@@ -1571,6 +1807,7 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
         comment = st.text_area("Reviewer comment")
         if st.button("Submit reviewer decision"):
             record_review(alert_id, role, decision, comment)
+            clear_app_caches()
             st.success("Reviewer decision recorded.")
     else:
         st.info("Only Admin or Reviewer roles can submit final alert decisions.")
@@ -1580,10 +1817,10 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
 def reports_panel(role: str, session_id: str | None) -> None:
     st.markdown('<span id="top"></span>', unsafe_allow_html=True)
     st.subheader("Reports")
-    sessions = list_sessions()
-    events = list_events()
-    alerts = list_alerts()
-    candidates = list_candidates()
+    sessions = cached_sessions()
+    events = cached_events()
+    alerts = cached_alerts()
+    candidates = cached_candidates()
 
     with st.container(border=True):
         st.write("Smart filters")
