@@ -49,7 +49,13 @@ from src.storage.device_check_repository import latest_device_check, save_device
 from src.storage.event_repository import list_alerts, list_events, save_alert, save_event
 from src.utils.file_utils import candidate_enrolment_dir, write_bytes
 from src.utils.geodata import COUNTRIES, NIGERIA_LGAS, NIGERIA_STATES
-from src.vision.visual_event_detector import VISUAL_EVENT_PRESETS, create_demo_visual_event
+from src.vision.face_detector import analyse_face_presence
+from src.vision.visual_event_detector import (
+    VISUAL_EVENT_DEFINITIONS,
+    create_event_from_face_detection,
+    create_visual_event,
+    is_visual_event,
+)
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -1991,6 +1997,99 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
             st.info("No camera/system events have been recorded for this session yet.")
 
 
+def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> None:
+    with st.container(border=True):
+        st.markdown("#### Visual Intelligence Foundation")
+        st.caption(
+            "Visual intelligence generates structured evidence events only. "
+            "It does not make final misconduct decisions and does not open any camera on page load."
+        )
+        session = get_cached_session(session_id)
+        mode = str(session.get("monitoring_mode") if session else "B")
+        col_session, col_primary, col_secondary = st.columns(3)
+        with col_session:
+            st.metric("Selected session", session_id)
+            st.caption(f"Monitoring Mode {mode}")
+        with col_primary:
+            st.metric("Primary camera context", "Face/gaze/head pose")
+        with col_secondary:
+            secondary_state = "Environment/object context" if mode == "B" else "Not required / fallback"
+            st.metric("Secondary camera context", secondary_state)
+            if mode == "C":
+                st.caption("Mirror-assisted mode: reflected environment evidence is treated conservatively.")
+
+        event_labels = [definition.label for definition in VISUAL_EVENT_DEFINITIONS.values()]
+        label_to_type = {definition.label: definition.event_type for definition in VISUAL_EVENT_DEFINITIONS.values()}
+
+        if has_permission(role, "generate_demo_events"):
+            st.write("Manual/prototype visual event hooks")
+            col_event, col_camera = st.columns(2)
+            with col_event:
+                selected_label = st.selectbox("Available visual event types", event_labels, key=f"visual_event_select_{session_id}")
+            with col_camera:
+                default_camera = VISUAL_EVENT_DEFINITIONS[label_to_type[selected_label]].camera_id
+                selected_camera = st.selectbox(
+                    "Camera context",
+                    ["primary", "secondary"],
+                    index=0 if default_camera == "primary" else 1,
+                    key=f"visual_camera_context_{session_id}",
+                )
+            if st.button("Generate selected visual evidence event", key=f"generate_visual_event_{session_id}"):
+                event = create_visual_event(session_id, candidate_id, label_to_type[selected_label], camera_id=selected_camera)
+                save_event(event)
+                alert = st.session_state.fusion_engine.ingest(event)
+                if alert:
+                    save_alert(alert)
+                log_audit(role, "visual_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
+                clear_app_caches()
+                st.success(f"Saved visual event: {event.event_type}.")
+                st.rerun()
+
+            with st.expander("Optional still-image face analysis", expanded=False):
+                st.caption("Upload a still image to run local prototype face-presence analysis without opening the camera.")
+                upload = st.file_uploader(
+                    "Upload visual evidence image",
+                    type=["jpg", "jpeg", "png"],
+                    key=f"visual_upload_{session_id}",
+                )
+                if upload and st.button("Analyse uploaded image", key=f"analyse_visual_upload_{session_id}"):
+                    image_bytes = upload.getvalue()
+                    result = analyse_face_presence(image_bytes)
+                    evidence_path = store_visual_evidence(session_id, candidate_id, result.status, image_bytes)
+                    event = create_event_from_face_detection(
+                        session_id=session_id,
+                        candidate_id=candidate_id,
+                        result=result,
+                        camera_id="primary",
+                        evidence_path=str(evidence_path),
+                    )
+                    save_event(event)
+                    alert = st.session_state.fusion_engine.ingest(event)
+                    if alert:
+                        save_alert(alert)
+                    log_audit(role, "visual_image_analysis_event", event.event_id, f"{event.event_type}; faces={result.face_count}")
+                    clear_app_caches()
+                    st.success(f"Image analysed and saved as {event.event_type}.")
+                    st.rerun()
+        else:
+            st.info("Your role can view visual events but cannot generate prototype visual events.")
+
+        visual_events = [event for event in cached_events(session_id) if is_visual_event(str(event.get("event_type", "")))]
+        st.write("Recent visual events")
+        if visual_events:
+            st.dataframe(pd.DataFrame(visual_events), use_container_width=True, hide_index=True)
+        else:
+            st.info("No visual intelligence events have been recorded for this session yet.")
+
+
+def store_visual_evidence(session_id: str, candidate_id: str, event_type: str, image_bytes: bytes) -> Path:
+    evidence_dir = APP_ROOT / "data" / "visual_evidence" / session_id / candidate_id
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    path = evidence_dir / f"{event_type}_{hashlib.sha256(image_bytes).hexdigest()[:10]}.jpg"
+    write_bytes(path, image_bytes)
+    return path
+
+
 def monitoring_panel(role: str, session_id: str | None) -> None:
     st.subheader("Live Monitoring and Demo Events")
     selected_session_id, selected_candidate_id = monitoring_session_selector()
@@ -2000,28 +2099,18 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
         st.info("Start or select a session to generate monitoring events.")
         return
     camera_stream_foundation_panel(role, session_id, candidate_id)
+    visual_intelligence_panel(role, session_id, candidate_id)
 
     if has_permission(role, "generate_demo_events"):
-        col1, col2 = st.columns(2)
-        with col1:
-            preset = st.selectbox("Visual/identity event", list(VISUAL_EVENT_PRESETS), key="monitoring_visual_event")
-            if st.button("Generate selected event"):
-                event = create_demo_visual_event(session_id, candidate_id, preset)
-                save_event(event)
-                alert = st.session_state.fusion_engine.ingest(event)
-                if alert:
-                    save_alert(alert)
-                clear_app_caches()
-                st.success("Structured event generated and fused.")
-        with col2:
-            if st.button("Generate background speech event"):
-                event = create_background_speech_event(session_id, candidate_id)
-                save_event(event)
-                alert = st.session_state.fusion_engine.ingest(event)
-                if alert:
-                    save_alert(alert)
-                clear_app_caches()
-                st.success("Audio event generated and fused.")
+        st.write("Audio demo hook")
+        if st.button("Generate background speech event"):
+            event = create_background_speech_event(session_id, candidate_id)
+            save_event(event)
+            alert = st.session_state.fusion_engine.ingest(event)
+            if alert:
+                save_alert(alert)
+            clear_app_caches()
+            st.success("Audio event generated and fused.")
     else:
         st.info("Your role cannot generate demo monitoring events.")
 

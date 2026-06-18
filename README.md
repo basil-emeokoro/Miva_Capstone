@@ -18,6 +18,7 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Admin, Human Proctor, and Reviewer RBAC
 - Mode A, B, and C monitoring configuration
 - Dual-camera stream status foundation using common event schema
+- Visual intelligence event foundation for face, camera, gaze/head-pose, person-count, and object-related evidence events
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
 - Rule-based Event Fusion Engine
@@ -90,6 +91,14 @@ python -m streamlit run app.py --server.port 8502
 - Camera events use the common evidence-event schema and are ready for Event Fusion Engine ingestion.
 - Streamlit remains the UI/control shell for dashboards, manual prototype hooks, review, and report preview. It is not the real monitoring engine.
 - Continuous monitoring should be driven later by service boundaries such as FastAPI endpoints, OpenCV/background workers, `streamlit-webrtc`, WebRTC/browser streams, or an external secure exam-player integration.
+
+## Visual Intelligence Foundation
+
+- The Monitoring page exposes visual intelligence controls for face presence, face absence, face obstruction, camera obstruction, multiple persons, looking away, head movement anomaly, mobile phone, and unauthorised object events.
+- Manual/prototype hooks generate structured visual events using the common `EvidenceEvent` schema and persist them in SQLite.
+- Optional still-image upload analysis performs local face/camera obstruction checks without opening the browser camera.
+- The vision module generates evidence only. It does not classify malpractice or make final decisions.
+- Continuous visual monitoring remains a service-layer responsibility for later OpenCV, FastAPI, background worker, `streamlit-webrtc`, WebRTC, or secure exam-player integration.
 
 ## Monitoring Roadmap
 

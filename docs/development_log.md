@@ -58,6 +58,15 @@
 - Preserved the privacy rule that no camera opens on page load.
 - Documented that Streamlit is only the dashboard/control surface. Continuous dual-camera monitoring should move to service boundaries such as `streamlit-webrtc`, FastAPI/OpenCV, background workers, WebRTC/browser streams, or secure exam-player event ingestion.
 
+## Computer Vision Intelligence Foundation
+
+- Added modular vision files for face presence analysis, prototype head-pose signalling, object-detection hooks, and visual evidence-event creation.
+- Added required visual event types: `face_present`, `face_absent`, `face_obstructed`, `camera_obstructed`, `multiple_persons_detected`, `looking_away`, `head_movement_anomaly`, `mobile_phone_detected`, and `unauthorised_object_detected`.
+- Exposed a Visual Intelligence Foundation panel in Monitoring with selected session context, primary/secondary camera context, manual visual event hooks, optional still-image face analysis, and recent visual events.
+- Persisted visual events through the common SQLite `events` table using the shared `EvidenceEvent` schema so Reports and the Event Fusion Engine can consume them.
+- Preserved the rule that no camera opens on page load; real continuous visual analysis remains a future service-layer integration.
+- Kept visual intelligence advisory only. Human review remains responsible for final decisions.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.
