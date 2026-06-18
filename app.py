@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -123,6 +124,19 @@ def clear_app_caches() -> None:
     cached_events.clear()
     cached_alerts.clear()
     cached_audit_logs.clear()
+
+
+def ensure_list(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(decoded, list):
+            return [str(item) for item in decoded]
+    return []
 
 
 def apply_theme() -> None:
@@ -2082,6 +2096,92 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
             st.info("No visual intelligence events have been recorded for this session yet.")
 
 
+def fusion_engine_panel(role: str, session_id: str, candidate_id: str) -> None:
+    with st.container(border=True):
+        st.markdown("#### Multi-Modal Event Fusion Engine")
+        st.caption(
+            "Fusion correlates stored evidence events across camera, audio, identity, behaviour, device, and session modules. "
+            "It produces explainable risk assessments for human review, not misconduct decisions."
+        )
+        events = cached_events(session_id)
+        alerts = cached_alerts(session_id)
+        latest_alert = alerts[0] if alerts else None
+
+        col_status, col_current, col_trend, col_modules = st.columns(4)
+        with col_status:
+            st.metric("Fusion status", "Ready" if events else "Waiting for evidence")
+            st.caption(f"{len(events)} raw event(s) available")
+        with col_current:
+            st.metric("Current risk score", latest_alert.get("current_risk_score", 0) if latest_alert else 0)
+            if latest_alert:
+                st.caption(f"Rolling: {latest_alert.get('rolling_risk_score', latest_alert.get('risk_score', 0))}")
+        with col_trend:
+            st.metric("Risk trend", str(latest_alert.get("risk_trend", "stable")).title() if latest_alert else "Stable")
+            if latest_alert:
+                st.caption(f"Level: {latest_alert.get('risk_level')}")
+        with col_modules:
+            modules = ensure_list(latest_alert.get("contributing_modules")) if latest_alert else []
+            st.metric("Contributing modules", len(modules))
+            if modules:
+                st.caption(", ".join(modules))
+
+        if latest_alert:
+            st.write("Fusion explanation preview")
+            st.info(str(latest_alert.get("explanation", "")))
+        else:
+            st.info("Generate visual, audio, identity, or camera events, then run fusion for the selected time window.")
+
+        if has_permission(role, "generate_demo_events"):
+            col_window, col_run = st.columns([2, 1])
+            with col_window:
+                window_seconds = st.selectbox(
+                    "Fusion time window",
+                    [5, 10, 30],
+                    index=2,
+                    format_func=lambda value: f"Last {value} seconds",
+                    key=f"fusion_window_{session_id}",
+                )
+            with col_run:
+                st.write("")
+                if st.button("Run fusion on stored events", key=f"run_fusion_{session_id}"):
+                    alert = st.session_state.fusion_engine.fuse_recent(session_id, int(window_seconds))
+                    if alert:
+                        save_alert(alert)
+                        log_audit(
+                            role,
+                            "fused_alert_generated",
+                            alert.alert_id,
+                            f"{alert.alert_type}; risk={alert.risk_score}; confidence={alert.confidence}",
+                        )
+                        clear_app_caches()
+                        st.success(f"Fused alert generated: {alert.alert_id} ({alert.risk_level}).")
+                        st.rerun()
+                    else:
+                        st.info("No actionable fused alert was generated for the selected time window.")
+        else:
+            st.info("Your role can inspect fused alerts but cannot trigger prototype fusion.")
+
+        st.write("Recent fused alerts")
+        if alerts:
+            alert_frame = pd.DataFrame(alerts)
+            preferred_columns = [
+                "alert_id",
+                "start_time",
+                "risk_level",
+                "current_risk_score",
+                "rolling_risk_score",
+                "risk_trend",
+                "confidence",
+                "alert_type",
+                "contributing_modules",
+                "review_status",
+            ]
+            display_columns = [column for column in preferred_columns if column in alert_frame.columns]
+            st.dataframe(alert_frame[display_columns], use_container_width=True, hide_index=True)
+        else:
+            st.info("No fused alerts have been generated for this session yet.")
+
+
 def store_visual_evidence(session_id: str, candidate_id: str, event_type: str, image_bytes: bytes) -> Path:
     evidence_dir = APP_ROOT / "data" / "visual_evidence" / session_id / candidate_id
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -2114,8 +2214,11 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     else:
         st.info("Your role cannot generate demo monitoring events.")
 
+    fusion_engine_panel(role, session_id, candidate_id)
+
     events = cached_events(session_id)
     if events:
+        st.write("Raw evidence events")
         st.dataframe(pd.DataFrame(events), use_container_width=True)
     return_to_top()
 
@@ -2131,10 +2234,41 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
         st.info("No fused alerts yet.")
         return
 
-    st.dataframe(pd.DataFrame(alerts), use_container_width=True)
+    alert_frame = pd.DataFrame(alerts)
+    st.dataframe(alert_frame, use_container_width=True)
+    alert_ids = [str(alert["alert_id"]) for alert in alerts]
+    alert_id = st.selectbox("Fused alert case", alert_ids, key="review_alert_case_select")
+    selected_alert = next(alert for alert in alerts if str(alert["alert_id"]) == alert_id)
+
+    st.write("Explainable alert detail")
+    col_level, col_current, col_rolling, col_confidence = st.columns(4)
+    with col_level:
+        st.metric("Suggested risk level", str(selected_alert.get("risk_level", "Low")))
+    with col_current:
+        st.metric("Current score", selected_alert.get("current_risk_score", selected_alert.get("risk_score", 0)))
+    with col_rolling:
+        st.metric("Rolling score", selected_alert.get("rolling_risk_score", selected_alert.get("risk_score", 0)))
+    with col_confidence:
+        st.metric("Fusion confidence", selected_alert.get("confidence", 0))
+    st.info(str(selected_alert.get("explanation", "No explanation was stored.")))
+    modules = ensure_list(selected_alert.get("contributing_modules"))
+    if modules:
+        st.caption(f"Contributing modules: {', '.join(modules)}")
+    trace = ensure_list(selected_alert.get("reasoning_trace"))
+    if trace:
+        with st.expander("Reasoning trace", expanded=False):
+            for item in trace:
+                st.write(f"- {item}")
+
+    supporting_ids = set(ensure_list(selected_alert.get("contributing_events")))
+    supporting_events = [event for event in cached_events(str(selected_alert["session_id"])) if str(event.get("event_id")) in supporting_ids]
+    with st.expander("Supporting evidence events", expanded=True):
+        if supporting_events:
+            st.dataframe(pd.DataFrame(supporting_events), use_container_width=True, hide_index=True)
+        else:
+            st.info("No supporting raw events were found for this alert.")
+
     if has_permission(role, "review_alerts"):
-        alert_ids = [str(alert["alert_id"]) for alert in alerts]
-        alert_id = st.selectbox("Alert to review", alert_ids, key="review_alert_select")
         decision = st.selectbox("Decision", ["accepted", "rejected", "escalated"], key="review_decision_select")
         comment = st.text_area("Reviewer comment")
         if st.button("Submit reviewer decision"):
@@ -2196,6 +2330,62 @@ def reports_panel(role: str, session_id: str | None) -> None:
         st.dataframe(pd.DataFrame(filtered_alerts), use_container_width=True)
     else:
         st.info("No fused alerts match the selected filters.")
+
+    st.write("Fusion Timeline")
+    if filtered_alerts:
+        timeline_columns = [
+            "alert_id",
+            "start_time",
+            "end_time",
+            "alert_type",
+            "risk_level",
+            "current_risk_score",
+            "rolling_risk_score",
+            "risk_trend",
+            "confidence",
+            "review_status",
+        ]
+        timeline_frame = pd.DataFrame(filtered_alerts)
+        st.dataframe(
+            timeline_frame[[column for column in timeline_columns if column in timeline_frame.columns]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No fusion timeline is available for the selected filters.")
+
+    st.write("Risk Trend")
+    if filtered_alerts:
+        trend_rows = [
+            {
+                "alert_id": alert.get("alert_id"),
+                "start_time": alert.get("start_time"),
+                "risk_level": alert.get("risk_level"),
+                "current_risk_score": alert.get("current_risk_score", alert.get("risk_score")),
+                "rolling_risk_score": alert.get("rolling_risk_score", alert.get("risk_score")),
+                "risk_trend": alert.get("risk_trend", "stable"),
+            }
+            for alert in filtered_alerts
+        ]
+        st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
+    else:
+        st.info("No risk trend records match the selected filters.")
+
+    st.write("Contributing Modules")
+    module_counts: dict[str, int] = {}
+    for alert in filtered_alerts:
+        for module in ensure_list(alert.get("contributing_modules")):
+            module_counts[module] = module_counts.get(module, 0) + 1
+    if module_counts:
+        st.dataframe(
+            pd.DataFrame(
+                [{"module": module, "alert_count": count} for module, count in sorted(module_counts.items())]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No contributing module summary is available for the selected filters.")
 
     export_session_id = selected_session_id or session_id
     if export_session_id and has_permission(role, "export_reports") and st.button("Export selected session JSON report"):

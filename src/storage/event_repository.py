@@ -23,13 +23,19 @@ def save_event(event: EvidenceEvent) -> None:
 def save_alert(alert: FusedAlert) -> None:
     data = alert.to_dict()
     data["contributing_events"] = json.dumps(data["contributing_events"])
+    data["contributing_modules"] = json.dumps(data["contributing_modules"])
+    data["reasoning_trace"] = json.dumps(data["reasoning_trace"])
     with get_connection() as connection:
         connection.execute(
             """
             INSERT OR REPLACE INTO fused_alerts(alert_id, session_id, candidate_id, start_time, end_time,
-            risk_score, risk_level, alert_type, contributing_events, explanation, recommended_action, review_status)
+            risk_score, risk_level, alert_type, contributing_events, explanation, recommended_action,
+            confidence, current_risk_score, rolling_risk_score, risk_trend, contributing_modules, reasoning_trace,
+            review_status)
             VALUES (:alert_id, :session_id, :candidate_id, :start_time, :end_time, :risk_score,
-            :risk_level, :alert_type, :contributing_events, :explanation, :recommended_action, :review_status)
+            :risk_level, :alert_type, :contributing_events, :explanation, :recommended_action,
+            :confidence, :current_risk_score, :rolling_risk_score, :risk_trend, :contributing_modules,
+            :reasoning_trace, :review_status)
             """,
             data,
         )
@@ -56,4 +62,15 @@ def list_alerts(session_id: str | None = None) -> list[dict[str, object]]:
     query += " ORDER BY start_time DESC"
     with get_connection() as connection:
         rows = connection.execute(query, params).fetchall()
-    return [dict(row) for row in rows]
+    return [_decode_alert_row(dict(row)) for row in rows]
+
+
+def _decode_alert_row(row: dict[str, object]) -> dict[str, object]:
+    for field in ("contributing_events", "contributing_modules", "reasoning_trace"):
+        value = row.get(field)
+        if isinstance(value, str):
+            try:
+                row[field] = json.loads(value)
+            except json.JSONDecodeError:
+                row[field] = []
+    return row

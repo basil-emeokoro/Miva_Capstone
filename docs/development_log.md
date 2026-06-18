@@ -67,6 +67,17 @@
 - Preserved the rule that no camera opens on page load; real continuous visual analysis remains a future service-layer integration.
 - Kept visual intelligence advisory only. Human review remains responsible for final decisions.
 
+## Multi-Modal Event Fusion Engine
+
+- Extended the fusion engine into a Streamlit-independent intelligence layer that can correlate persisted SQLite evidence events across configurable time windows.
+- Added modular prototype rules for primary-camera avoidance, possible third-party assistance, unauthorised presence, reduced monitoring confidence, and high-risk behavioural patterns.
+- Added duplicate suppression by event signature, weighted confidence aggregation, current risk score, rolling risk score, risk trend, risk-level classification, contributing modules, and reasoning trace.
+- Migrated the `fused_alerts` table with confidence, current/rolling score, risk trend, contributing modules, and reasoning trace fields while keeping raw evidence events immutable.
+- Exposed fusion status, risk score, trend, explanation preview, recent fused alerts, and a user-triggered stored-event fusion action in Monitoring.
+- Updated Reports to show raw events, fused alerts, fusion timeline, risk trend, and contributing-module summaries.
+- Updated Review so human reviewers inspect explainable fused alerts and supporting raw events rather than isolated event rows only.
+- Preserved the rule that fusion does not make final misconduct decisions; it prepares explainable risk assessments for human review and later orchestration.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.

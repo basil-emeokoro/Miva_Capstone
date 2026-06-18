@@ -21,8 +21,7 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Visual intelligence event foundation for face, camera, gaze/head-pose, person-count, and object-related evidence events
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
-- Rule-based Event Fusion Engine
-- Explainable fused alerts
+- Rule-based multi-modal Event Fusion Engine with time-window correlation, duplicate suppression, risk scoring, confidence aggregation, and explainable fused alerts
 - Reviewer accept/reject/escalate workflow
 - JSON session report export
 - SQLite local storage
@@ -99,6 +98,17 @@ python -m streamlit run app.py --server.port 8502
 - Optional still-image upload analysis performs local face/camera obstruction checks without opening the browser camera.
 - The vision module generates evidence only. It does not classify malpractice or make final decisions.
 - Continuous visual monitoring remains a service-layer responsibility for later OpenCV, FastAPI, background worker, `streamlit-webrtc`, WebRTC, or secure exam-player integration.
+
+## Multi-Modal Event Fusion Engine
+
+- The fusion engine reads immutable raw `EvidenceEvent` records from SQLite and correlates them within configurable windows such as 5, 10, or 30 seconds.
+- Prototype fusion rules currently cover primary-camera avoidance, possible third-party assistance, unauthorised presence, reduced monitoring confidence, and high-risk behavioural patterns.
+- Fused alerts store contributing events, contributing modules, current risk score, rolling risk score, risk trend, confidence, explanation, recommended reviewer action, and reasoning trace.
+- Raw evidence events are not overwritten. Fused alerts are separate review objects for human-supervised decision-making.
+- The Monitoring page exposes fusion status, current/rolling risk, trend, contributing modules, explanation preview, and recent fused alerts.
+- Reports expose raw events, fused alerts, fusion timeline, risk trend, and contributing-module summaries.
+- The Review page presents fused alerts as explainable cases with supporting raw events before reviewer accept/reject/escalate decisions.
+- The fusion module is independent of Streamlit and can be called from future FastAPI services, background workers, a secure exam player, or unit tests.
 
 ## Monitoring Roadmap
 

@@ -55,6 +55,12 @@ class FusedAlert:
     contributing_events: list[str]
     explanation: str
     recommended_action: str
+    confidence: float = 0.0
+    current_risk_score: int = 0
+    rolling_risk_score: int = 0
+    risk_trend: str = "stable"
+    contributing_modules: list[str] = field(default_factory=list)
+    reasoning_trace: list[str] = field(default_factory=list)
     review_status: str = "pending"
     alert_id: str = field(default_factory=lambda: f"ALT-{uuid4().hex[:8].upper()}")
 
@@ -71,5 +77,11 @@ class FusedAlert:
             "contributing_events": self.contributing_events,
             "explanation": self.explanation,
             "recommended_action": self.recommended_action,
+            "confidence": self.confidence,
+            "current_risk_score": self.current_risk_score,
+            "rolling_risk_score": self.rolling_risk_score,
+            "risk_trend": self.risk_trend,
+            "contributing_modules": self.contributing_modules,
+            "reasoning_trace": self.reasoning_trace,
             "review_status": self.review_status,
         }

@@ -127,6 +127,12 @@ CREATE TABLE IF NOT EXISTS fused_alerts (
     contributing_events TEXT NOT NULL,
     explanation TEXT NOT NULL,
     recommended_action TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0,
+    current_risk_score INTEGER NOT NULL DEFAULT 0,
+    rolling_risk_score INTEGER NOT NULL DEFAULT 0,
+    risk_trend TEXT NOT NULL DEFAULT 'stable',
+    contributing_modules TEXT NOT NULL DEFAULT '[]',
+    reasoning_trace TEXT NOT NULL DEFAULT '[]',
     review_status TEXT NOT NULL
 );
 
@@ -168,6 +174,7 @@ def initialize_database(path: str | Path | None = None) -> None:
     with get_connection(path) as connection:
         connection.executescript(SCHEMA)
         _ensure_candidate_columns(connection)
+        _ensure_fused_alert_columns(connection)
 
 
 def fetch_all(query: str, params: Iterable[object] = ()) -> list[sqlite3.Row]:
@@ -194,3 +201,18 @@ def _ensure_candidate_columns(connection: sqlite3.Connection) -> None:
     for column, definition in required_columns.items():
         if column not in existing:
             connection.execute(f"ALTER TABLE candidates ADD COLUMN {column} {definition}")
+
+
+def _ensure_fused_alert_columns(connection: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in connection.execute("PRAGMA table_info(fused_alerts)").fetchall()}
+    required_columns = {
+        "confidence": "REAL NOT NULL DEFAULT 0",
+        "current_risk_score": "INTEGER NOT NULL DEFAULT 0",
+        "rolling_risk_score": "INTEGER NOT NULL DEFAULT 0",
+        "risk_trend": "TEXT NOT NULL DEFAULT 'stable'",
+        "contributing_modules": "TEXT NOT NULL DEFAULT '[]'",
+        "reasoning_trace": "TEXT NOT NULL DEFAULT '[]'",
+    }
+    for column, definition in required_columns.items():
+        if column not in existing:
+            connection.execute(f"ALTER TABLE fused_alerts ADD COLUMN {column} {definition}")
