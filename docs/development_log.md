@@ -46,6 +46,17 @@
 - Relabelled the sidebar role control as a Prototype Role Simulator and documented that production staff roles would come from secure login while candidates would not use the SERPS dashboard.
 - Made the footer clearer and centred while preserving the academic prototype tone.
 
+## Dual-Camera Management and Event Stream Foundation
+
+- Added a camera discovery abstraction that exposes safe browser-managed primary and secondary camera slots without opening camera hardware.
+- Added monitoring-mode-aware camera requirements: Mode A and Mode C require primary camera only, while Mode B requires primary and secondary cameras.
+- Added a camera stream status model with `ready`, `missing`, `disconnected`, and `not_required` states.
+- Added camera readiness status cards and manual stream-health event hooks on the Monitoring page.
+- Persisted camera/system events through the common SQLite `events` table using the shared evidence-event schema.
+- Prepared missing/disconnected camera events for Event Fusion Engine ingestion while keeping camera modules advisory only.
+- Preserved the privacy rule that no camera opens on page load.
+- Documented that continuous dual-camera streaming should move to `streamlit-webrtc`, FastAPI/OpenCV, or a dedicated WebRTC frontend for production-grade behaviour.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.

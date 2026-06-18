@@ -17,6 +17,7 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Draft registration and duplicate-enrolment validation
 - Admin, Human Proctor, and Reviewer RBAC
 - Mode A, B, and C monitoring configuration
+- Dual-camera stream status foundation using common event schema
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
 - Rule-based Event Fusion Engine
@@ -56,6 +57,7 @@ python -m streamlit run app.py --server.port 8502
 - This is not a production-grade proctoring platform.
 - The app now lazy-loads heavier face-processing modules behind user-triggered camera actions and caches short-lived read-only lists for candidates, sessions, events, alerts, audit records, and the logo. Streamlit still reruns scripts after widget interaction, so large local databases may require pagination in a production build.
 - Camera previews are user-triggered only. This preserves browser privacy and prevents camera activation on page load.
+- Dual-camera management currently records browser-managed camera slots and stream-health events. It does not open or continuously stream cameras on page load.
 - Pre-exam device checks are prototype confirmations. Primary/secondary camera checks can use explicit Streamlit camera previews; microphone, lighting, candidate presence, environment declaration, and mirror placement are manual staff confirmations.
 - Streamlit does not provide a built-in local microphone test equivalent to `st.camera_input`, so microphone readiness is represented as a manual prototype check.
 - Streamlit tabs eagerly default to the first tab and do not provide full routed-page behaviour, so this prototype uses sidebar-controlled page navigation and session-state wizard steps for cleaner flow control.
@@ -79,6 +81,13 @@ python -m streamlit run app.py --server.port 8502
 - Mode A - single-camera CBT mode: requires primary camera, microphone, lighting, candidate presence, and environment declaration. Secondary camera and mirror are not required.
 - Mode B - dual-camera full mode: requires primary camera, secondary camera, microphone, lighting, candidate presence, and environment declaration. Mirror is not required.
 - Mode C - mirror-assisted low-resource mode: requires primary camera, microphone, lighting, candidate presence, environment declaration, and mirror placement. Secondary camera is not required.
+
+## Dual-Camera Event Foundation
+
+- The Monitoring page exposes primary and secondary camera slots without activating camera hardware.
+- Camera readiness and health events are persisted through the same SQLite `events` table used by visual, audio, identity, and behavioural events.
+- Camera events use the common evidence-event schema and are ready for Event Fusion Engine ingestion.
+- Streamlit remains the UI/control shell. Production-grade continuous streams should move to `streamlit-webrtc`, a FastAPI/OpenCV service, or a dedicated WebRTC frontend.
 
 ## Monitoring Roadmap
 
