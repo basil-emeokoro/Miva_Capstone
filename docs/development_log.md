@@ -52,10 +52,11 @@
 - Added monitoring-mode-aware camera requirements: Mode A and Mode C require primary camera only, while Mode B requires primary and secondary cameras.
 - Added a camera stream status model with `ready`, `missing`, `disconnected`, and `not_required` states.
 - Added camera readiness status cards and manual stream-health event hooks on the Monitoring page.
+- Exposed the camera foundation directly in Monitoring through an active/reporting session selector, monitoring-mode display, primary/secondary selectors, requirement indicators, status cards, readiness events, missing-camera events, disconnected-camera events, and a recent camera/system events table.
 - Persisted camera/system events through the common SQLite `events` table using the shared evidence-event schema.
 - Prepared missing/disconnected camera events for Event Fusion Engine ingestion while keeping camera modules advisory only.
 - Preserved the privacy rule that no camera opens on page load.
-- Documented that continuous dual-camera streaming should move to `streamlit-webrtc`, FastAPI/OpenCV, or a dedicated WebRTC frontend for production-grade behaviour.
+- Documented that Streamlit is only the dashboard/control surface. Continuous dual-camera monitoring should move to service boundaries such as `streamlit-webrtc`, FastAPI/OpenCV, background workers, WebRTC/browser streams, or secure exam-player event ingestion.
 
 ## Load-Time Optimisation Notes
 

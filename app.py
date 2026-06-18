@@ -1534,6 +1534,37 @@ def get_cached_session(session_id: str | None) -> dict[str, object] | None:
     return next((session for session in cached_sessions() if str(session["session_id"]) == str(session_id)), None)
 
 
+def monitoring_session_selector() -> tuple[str | None, str | None]:
+    sessions = cached_sessions()
+    st.markdown("#### Active/reporting session")
+    if not sessions:
+        st.info("No sessions are available yet. Start a prototype session from Session Control to attach camera events.")
+        return None, None
+    status_filter = st.selectbox("Session filter", ["active", "ended", "all"], key="monitoring_session_status_filter")
+    visible_sessions = [session for session in sessions if status_filter == "all" or session["session_status"] == status_filter]
+    if not visible_sessions:
+        st.warning(f"No {status_filter} sessions found. Change the filter or start a session.")
+        return None, None
+    labels = [
+        f"{session['session_id']} - {session['candidate_id']} - Mode {session['monitoring_mode']} - {session['session_status']}"
+        for session in visible_sessions
+    ]
+    active_session_id = st.session_state.get("active_session_id")
+    default_index = 0
+    if active_session_id:
+        for index, label in enumerate(labels):
+            if str(active_session_id) in label:
+                default_index = index
+                break
+    selected = st.selectbox("Session", labels, index=default_index, key="monitoring_active_session_select")
+    session_id = selected.split(" - ")[0]
+    session = next(session for session in visible_sessions if str(session["session_id"]) == session_id)
+    candidate_id = str(session["candidate_id"])
+    st.session_state.active_session_id = session_id
+    st.session_state.active_candidate_id = candidate_id
+    return session_id, candidate_id
+
+
 def render_audit_trail_panel() -> None:
     with st.expander("Recent audit trail", expanded=False):
         logs = cached_audit_logs(30)
@@ -1786,6 +1817,11 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
     devices = discover_camera_devices()
     primary_devices = [device for device in devices if device.role_hint == "primary"]
     secondary_devices = [device for device in devices if device.role_hint == "secondary"]
+    mode_notes = {
+        "A": "Mode A: CBT single-camera mode. Primary camera is required; secondary camera is not required.",
+        "B": "Mode B: dual-camera full mode. Primary and secondary cameras are both required.",
+        "C": "Mode C: mirror-assisted low-resource mode. Primary camera is required; secondary camera is not required because mirror support is used.",
+    }
 
     with st.container(border=True):
         st.markdown("#### Dual-Camera Stream Foundation")
@@ -1793,39 +1829,50 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
             "Camera slots are browser-managed and no camera opens on page load. "
             "This panel records camera/system events through the common evidence-event schema."
         )
-        col_primary, col_secondary, col_mode = st.columns(3)
-        with col_primary:
-            st.metric("Primary camera", "Required" if "primary" in required_roles else "Not Required")
-        with col_secondary:
-            st.metric("Secondary camera", "Required" if "secondary" in required_roles else "Not Required")
+        st.info(mode_notes.get(mode, "Monitoring mode requirements are unavailable."))
+        col_mode, col_primary_req, col_secondary_req = st.columns(3)
         with col_mode:
             st.metric("Monitoring mode", f"Mode {mode}")
+            if mode == "C":
+                st.caption("Mirror-assisted setup: secondary camera is not required.")
+        with col_primary_req:
+            st.metric("Primary requirement", "Required" if "primary" in required_roles else "Not Required")
+        with col_secondary_req:
+            st.metric("Secondary requirement", "Required" if "secondary" in required_roles else "Not Required")
 
-        selected_primary = st.selectbox(
-            "Primary camera slot",
-            [device.label for device in primary_devices],
-            key=f"camera_primary_slot_{session_id}",
-        )
-        secondary_labels = [device.label for device in secondary_devices]
-        if "secondary" not in required_roles:
-            secondary_labels = ["Not required for selected mode"] + secondary_labels
-        selected_secondary = st.selectbox(
-            "Secondary camera slot",
-            secondary_labels,
-            key=f"camera_secondary_slot_{session_id}",
-        )
+        st.write("Camera selection")
+        col_primary_select, col_secondary_select = st.columns(2)
+        with col_primary_select:
+            selected_primary = st.selectbox(
+                "Primary camera selector",
+                [device.label for device in primary_devices],
+                key=f"camera_primary_slot_{session_id}",
+            )
+        with col_secondary_select:
+            secondary_labels = [device.label for device in secondary_devices]
+            if "secondary" not in required_roles:
+                secondary_labels = ["Not required for selected mode"] + secondary_labels
+            selected_secondary = st.selectbox(
+                "Secondary camera selector",
+                secondary_labels,
+                key=f"camera_secondary_slot_{session_id}",
+            )
 
-        primary_connected = st.checkbox(
-            "Primary stream ready",
-            value=True,
-            key=f"camera_primary_ready_{session_id}",
-        )
-        secondary_connected = st.checkbox(
-            "Secondary stream ready",
-            value="secondary" in required_roles,
-            disabled="secondary" not in required_roles,
-            key=f"camera_secondary_ready_{session_id}",
-        )
+        st.write("Camera readiness controls")
+        col_primary, col_secondary = st.columns(2)
+        with col_primary:
+            primary_connected = st.checkbox(
+                "Primary stream ready",
+                value=True,
+                key=f"camera_primary_ready_{session_id}",
+            )
+        with col_secondary:
+            secondary_connected = st.checkbox(
+                "Secondary stream ready",
+                value="secondary" in required_roles,
+                disabled="secondary" not in required_roles,
+                key=f"camera_secondary_ready_{session_id}",
+            )
 
         statuses = evaluate_camera_streams(
             mode=mode,
@@ -1834,6 +1881,7 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
             primary_label=selected_primary,
             secondary_label=selected_secondary,
         )
+        st.write("Camera status cards")
         status_cols = st.columns(2)
         for index, status in enumerate(statuses):
             with status_cols[index]:
@@ -1841,7 +1889,8 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
                 st.caption(status.detail)
 
         if has_permission(role, "generate_demo_events"):
-            col_record, col_note = st.columns([1, 2])
+            st.write("Manual event hooks")
+            col_record, col_missing, col_disconnect = st.columns(3)
             with col_record:
                 if st.button("Record camera readiness events", key=f"record_camera_readiness_{session_id}"):
                     for status in statuses:
@@ -1851,8 +1900,43 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
                     clear_app_caches()
                     st.success("Camera readiness events saved to SQLite.")
                     st.rerun()
-            with col_note:
-                st.caption("Readiness events are persisted for event-stream continuity and later fusion/orchestration use.")
+            with col_missing:
+                if st.button("Generate missing-camera event", key=f"generate_camera_missing_{session_id}"):
+                    target_camera = "secondary" if "secondary" in required_roles else "primary"
+                    event = manual_camera_health_event(
+                        session_id,
+                        candidate_id,
+                        target_camera,
+                        "camera_stream_missing",
+                        f"{target_camera.title()} camera is missing from the current monitoring setup.",
+                    )
+                    save_event(event)
+                    alert = st.session_state.fusion_engine.ingest(event)
+                    if alert:
+                        save_alert(alert)
+                    log_audit(role, "camera_missing_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
+                    clear_app_caches()
+                    st.warning(f"Saved missing-camera event for {target_camera} camera.")
+                    st.rerun()
+            with col_disconnect:
+                if st.button("Generate disconnected event", key=f"generate_camera_disconnected_{session_id}"):
+                    target_camera = "secondary" if "secondary" in required_roles else "primary"
+                    event = manual_camera_health_event(
+                        session_id,
+                        candidate_id,
+                        target_camera,
+                        "camera_stream_disconnected",
+                        f"{target_camera.title()} camera stream disconnected during monitoring.",
+                    )
+                    save_event(event)
+                    alert = st.session_state.fusion_engine.ingest(event)
+                    if alert:
+                        save_alert(alert)
+                    log_audit(role, "camera_disconnected_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
+                    clear_app_caches()
+                    st.warning(f"Saved disconnected-camera event for {target_camera} camera.")
+                    st.rerun()
+            st.caption("Readiness, missing, and disconnected events are persisted for event-stream continuity and later fusion/orchestration use.")
 
             with st.expander("Manual camera health event hooks", expanded=False):
                 st.caption("These hooks simulate stream health events without object detection or malpractice decisions.")
@@ -1909,10 +1993,12 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
 
 def monitoring_panel(role: str, session_id: str | None) -> None:
     st.subheader("Live Monitoring and Demo Events")
+    selected_session_id, selected_candidate_id = monitoring_session_selector()
+    session_id = selected_session_id or session_id
+    candidate_id = selected_candidate_id or str(st.session_state.get("active_candidate_id", ""))
     if not session_id:
         st.info("Start or select a session to generate monitoring events.")
         return
-    candidate_id = str(st.session_state.get("active_candidate_id"))
     camera_stream_foundation_panel(role, session_id, candidate_id)
 
     if has_permission(role, "generate_demo_events"):

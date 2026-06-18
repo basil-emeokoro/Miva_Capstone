@@ -85,9 +85,11 @@ python -m streamlit run app.py --server.port 8502
 ## Dual-Camera Event Foundation
 
 - The Monitoring page exposes primary and secondary camera slots without activating camera hardware.
+- Monitoring includes an active/reporting session selector, monitoring-mode display, primary/secondary selectors, requirement cards, readiness status cards, and manual readiness/missing/disconnected event hooks.
 - Camera readiness and health events are persisted through the same SQLite `events` table used by visual, audio, identity, and behavioural events.
 - Camera events use the common evidence-event schema and are ready for Event Fusion Engine ingestion.
-- Streamlit remains the UI/control shell. Production-grade continuous streams should move to `streamlit-webrtc`, a FastAPI/OpenCV service, or a dedicated WebRTC frontend.
+- Streamlit remains the UI/control shell for dashboards, manual prototype hooks, review, and report preview. It is not the real monitoring engine.
+- Continuous monitoring should be driven later by service boundaries such as FastAPI endpoints, OpenCV/background workers, `streamlit-webrtc`, WebRTC/browser streams, or an external secure exam-player integration.
 
 ## Monitoring Roadmap
 
