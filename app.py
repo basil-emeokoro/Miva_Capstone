@@ -574,6 +574,10 @@ def candidate_management(role: str) -> None:
 def enrolment_dashboard() -> None:
     st.markdown("#### Enrolment Dashboard")
     st.caption("Choose the next enrolment action. Candidate registration fields remain hidden until a new registration is started.")
+    candidates = cached_candidates()
+    eligible_face_candidates = face_capture_eligible_candidates(candidates)
+    if st.session_state.get("face_gate_message"):
+        st.warning(str(st.session_state.pop("face_gate_message")))
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("Register New Candidate", key="start_new_registration", use_container_width=True):
@@ -581,12 +585,15 @@ def enrolment_dashboard() -> None:
             st.session_state.pop("enrolment_candidate_id", None)
             st.rerun()
     with col2:
-        disabled = not cached_candidates()
+        disabled = not candidates
         if st.button("Continue Face Capture", key="continue_face_capture", disabled=disabled, use_container_width=True):
-            st.session_state.enrolment_step = "face"
+            if not eligible_face_candidates:
+                st.session_state.face_gate_message = "Please register or save candidate biodata before guided face capture."
+            else:
+                st.session_state.enrolment_step = "face"
             st.rerun()
     with col3:
-        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not cached_candidates(), use_container_width=True):
+        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not candidates, use_container_width=True):
             st.session_state.enrolment_step = "profile"
             st.rerun()
 
@@ -679,6 +686,11 @@ def _filter_candidates(candidates: list[dict[str, object]], search: str) -> list
         or query in str(candidate.get("matric_number", "")).lower()
         or query in str(candidate.get("waec_registration_number", "")).lower()
     ]
+
+
+def face_capture_eligible_candidates(candidates: list[dict[str, object]]) -> list[dict[str, object]]:
+    eligible_statuses = {"registered_pending_face_capture", "face_enrolled", "authenticated"}
+    return [candidate for candidate in candidates if candidate.get("enrolment_status") in eligible_statuses]
 
 
 def render_enrolment_steps() -> None:
@@ -889,13 +901,22 @@ def guided_face_enrolment() -> None:
     st.markdown("#### Guided facial enrolment")
     st.caption("AI validation checks that a single face is visible before each sample is saved.")
     if not candidates:
-        st.info("No registered candidates yet.")
+        st.info("Please register or save candidate biodata before guided face capture.")
         if st.button("Back to registration"):
             st.session_state.enrolment_step = "register"
             st.rerun()
         return
 
-    candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in candidates}
+    eligible_candidates = face_capture_eligible_candidates(candidates)
+    if not eligible_candidates:
+        st.warning("Please register or save candidate biodata before guided face capture.")
+        st.caption("Draft-only and unsaved candidates cannot access facial enrolment because face samples must attach to an existing registered identity record.")
+        if st.button("Back to registration"):
+            st.session_state.enrolment_step = "register"
+            st.rerun()
+        return
+
+    candidate_options = {f"{c['full_name']} ({c['candidate_id']})": c for c in eligible_candidates}
     default_candidate_id = st.session_state.get("enrolment_candidate_id")
     labels = list(candidate_options)
     default_index = 0
@@ -907,12 +928,6 @@ def guided_face_enrolment() -> None:
     selected = st.selectbox("Candidate for face capture", labels, index=default_index, key="face_capture_candidate_select")
     candidate = candidate_options[selected]
     candidate_id = str(candidate["candidate_id"])
-    if candidate.get("enrolment_status") == "draft":
-        st.warning("This candidate is still a draft. Complete registration and consent before starting guided face capture.")
-        if st.button("Back to registration"):
-            st.session_state.enrolment_step = "register"
-            st.rerun()
-        return
     done = captured_directions(candidate_id)
     progress = len(done) / len(FACE_DIRECTIONS)
     st.progress(progress, text=f"{len(done)} of {len(FACE_DIRECTIONS)} directions captured")
@@ -1853,17 +1868,17 @@ def reports_panel(role: str, session_id: str | None) -> None:
     if selected_review != "All review statuses":
         filtered_alerts = [alert for alert in filtered_alerts if str(alert.get("review_status")) == selected_review]
 
-    st.write("Filtered events")
+    st.write("Table 1: Filtered Events")
     if filtered_events:
         st.dataframe(pd.DataFrame(filtered_events), use_container_width=True)
     else:
         st.info("No events match the selected filters.")
 
-    st.write("Filtered alerts")
+    st.write("Table 2: Filtered Fused Alerts")
     if filtered_alerts:
         st.dataframe(pd.DataFrame(filtered_alerts), use_container_width=True)
     else:
-        st.info("No alerts match the selected filters.")
+        st.info("No fused alerts match the selected filters.")
 
     export_session_id = selected_session_id or session_id
     if export_session_id and has_permission(role, "export_reports") and st.button("Export selected session JSON report"):
