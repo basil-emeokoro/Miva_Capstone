@@ -609,20 +609,20 @@ def enrolment_dashboard() -> None:
         st.warning(str(st.session_state.pop("face_gate_message")))
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("Register New Candidate", key="start_new_registration", use_container_width=True):
+        if st.button("Register New Candidate", key="start_new_registration", width="stretch"):
             st.session_state.enrolment_step = "register"
             st.session_state.pop("enrolment_candidate_id", None)
             st.rerun()
     with col2:
         disabled = not candidates
-        if st.button("Continue Face Capture", key="continue_face_capture", disabled=disabled, use_container_width=True):
+        if st.button("Continue Face Capture", key="continue_face_capture", disabled=disabled, width="stretch"):
             if not eligible_face_candidates:
                 st.session_state.face_gate_message = "Please register or save candidate biodata before guided face capture."
             else:
                 st.session_state.enrolment_step = "face"
             st.rerun()
     with col3:
-        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not candidates, use_container_width=True):
+        if st.button("View My Profile / View Candidate Profile", key="open_enrolment_profile", disabled=not candidates, width="stretch"):
             st.session_state.enrolment_step = "profile"
             st.rerun()
 
@@ -681,7 +681,7 @@ def candidate_profiles_page(role: str) -> None:
         }
         for candidate in visible_candidates
     ]
-    st.dataframe(pd.DataFrame(list_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(list_rows), width="stretch", hide_index=True)
 
     search = st.text_input("Search candidate profiles", key=f"candidate_profiles_search_{role}", placeholder="Type name, Student ID, or Candidate ID")
     if not search.strip():
@@ -1510,7 +1510,7 @@ def render_last_saved_check(check: dict[str, object]) -> None:
                 {"field": "Override reason", "value": check.get("override_reason") or ""},
             ]
         ),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -1593,7 +1593,7 @@ def render_audit_trail_panel() -> None:
         if not logs:
             st.info("No audit records found.")
             return
-        st.dataframe(pd.DataFrame(logs), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(logs), width="stretch", hide_index=True)
 
 
 def candidate_profile_summary(candidate_id: str) -> None:
@@ -1645,18 +1645,18 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False, al
     visible_identifier_rows = [row for row in identifier_rows if row["value"]]
     if visible_identifier_rows:
         st.write("Institutional and demographic details")
-        st.dataframe(pd.DataFrame(visible_identifier_rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(visible_identifier_rows), width="stretch")
     if allow_biodata_edit:
         render_biodata_edit_form(candidate)
     st.progress(len(captured) / len(FACE_DIRECTIONS), text=f"{len(captured)} of {len(FACE_DIRECTIONS)} required face samples captured")
     if custom_fields:
         st.write("Custom fields")
         field_rows = pd.DataFrame(custom_fields)[["field_name", "field_value"]]
-        st.dataframe(field_rows, use_container_width=True)
+        st.dataframe(field_rows, width="stretch")
     if samples:
         st.write("Face enrolment records")
         visible_columns = ["capture_direction", "quality_score", "image_path", "embedding_path", "captured_at"]
-        st.dataframe(pd.DataFrame(samples)[visible_columns], use_container_width=True)
+        st.dataframe(pd.DataFrame(samples)[visible_columns], width="stretch")
         if include_images:
             st.write("Captured face samples")
             cols = st.columns(3)
@@ -1667,7 +1667,7 @@ def render_candidate_profile(candidate_id: str, include_images: bool = False, al
                         st.image(
                             str(image_path),
                             caption=f"{sample['capture_direction']} | quality {float(sample['quality_score']):.2f}",
-                            use_container_width=True,
+                            width="stretch",
                         )
 
 
@@ -2008,7 +2008,7 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
         ]
         st.write("Persisted camera/system events")
         if camera_events:
-            st.dataframe(pd.DataFrame(camera_events), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(camera_events), width="stretch", hide_index=True)
         else:
             st.info("No camera/system events have been recorded for this session yet.")
 
@@ -2108,7 +2108,7 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
         visual_events = [event for event in cached_events(session_id) if is_visual_event(str(event.get("event_type", "")))]
         st.write("Recent visual events")
         if visual_events:
-            st.dataframe(pd.DataFrame(visual_events), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(visual_events), width="stretch", hide_index=True)
         else:
             st.info("No visual intelligence events have been recorded for this session yet.")
 
@@ -2449,7 +2449,7 @@ def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str)
             ["Evidence arrives", "Timeline updates", "CIE reasons", "Risk updates", "Reviewer action"],
             strict=True,
         ):
-            column.button(label, disabled=True, use_container_width=True)
+            column.button(label, disabled=True, width="stretch")
 
         col_session, col_risk, col_trend, col_confidence, col_recommendation = st.columns(5)
         with col_session:
@@ -2548,7 +2548,7 @@ def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str)
                 temporal_results = st.session_state.get(f"cie_temporal_results_{session_id}")
                 if temporal_results:
                     st.write("Temporal window sensitivity results")
-                    st.dataframe(pd.DataFrame(temporal_results), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(temporal_results), width="stretch", hide_index=True)
         else:
             st.info("Your role can inspect CIE alerts but cannot trigger prototype contextual analysis.")
 
@@ -2568,13 +2568,13 @@ def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str)
                     "review_status",
                 ]
                 display_columns = [column for column in preferred_columns if column in alert_frame.columns]
-                st.dataframe(alert_frame[display_columns], use_container_width=True, hide_index=True)
+                st.dataframe(alert_frame[display_columns], width="stretch", hide_index=True)
             else:
                 st.info("No contextual/fused alerts have been generated for this session yet.")
 
         with st.expander("Technical details: raw evidence events table", expanded=False):
             if events:
-                st.dataframe(pd.DataFrame(events), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(events), width="stretch", hide_index=True)
             else:
                 st.info("No raw evidence events have been recorded for this session yet.")
 
@@ -2623,7 +2623,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     events = cached_events(session_id)
     with st.expander("Technical audit table: all raw evidence events", expanded=False):
         if events:
-            st.dataframe(pd.DataFrame(events), use_container_width=True)
+            st.dataframe(pd.DataFrame(events), width="stretch")
         else:
             st.info("No raw evidence events have been recorded for this session yet.")
     return_to_top()
@@ -2641,7 +2641,7 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
         return
 
     alert_frame = pd.DataFrame(alerts)
-    st.dataframe(alert_frame, use_container_width=True)
+    st.dataframe(alert_frame, width="stretch")
     alert_ids = [str(alert["alert_id"]) for alert in alerts]
     alert_id = st.selectbox("CIE-generated alert case", alert_ids, key="review_alert_case_select")
     selected_alert = next(alert for alert in alerts if str(alert["alert_id"]) == alert_id)
@@ -2670,7 +2670,7 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
     supporting_events = [event for event in cached_events(str(selected_alert["session_id"])) if str(event.get("event_id")) in supporting_ids]
     with st.expander("Supporting evidence events", expanded=True):
         if supporting_events:
-            st.dataframe(pd.DataFrame(supporting_events), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(supporting_events), width="stretch", hide_index=True)
         else:
             st.info("No supporting raw events were found for this alert.")
 
@@ -2727,13 +2727,13 @@ def reports_panel(role: str, session_id: str | None) -> None:
 
     st.write("Table 1: Filtered Events")
     if filtered_events:
-        st.dataframe(pd.DataFrame(filtered_events), use_container_width=True)
+        st.dataframe(pd.DataFrame(filtered_events), width="stretch")
     else:
         st.info("No events match the selected filters.")
 
     st.write("Table 2: Filtered Contextual/Fused Alerts")
     if filtered_alerts:
-        st.dataframe(pd.DataFrame(filtered_alerts), use_container_width=True)
+        st.dataframe(pd.DataFrame(filtered_alerts), width="stretch")
     else:
         st.info("No contextual/fused alerts match the selected filters.")
 
@@ -2754,7 +2754,7 @@ def reports_panel(role: str, session_id: str | None) -> None:
         timeline_frame = pd.DataFrame(filtered_alerts)
         st.dataframe(
             timeline_frame[[column for column in timeline_columns if column in timeline_frame.columns]],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -2773,7 +2773,7 @@ def reports_panel(role: str, session_id: str | None) -> None:
             }
             for alert in filtered_alerts
         ]
-        st.dataframe(pd.DataFrame(trend_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(trend_rows), width="stretch", hide_index=True)
     else:
         st.info("No risk trend records match the selected filters.")
 
@@ -2787,7 +2787,7 @@ def reports_panel(role: str, session_id: str | None) -> None:
             pd.DataFrame(
                 [{"module": module, "alert_count": count} for module, count in sorted(module_counts.items())]
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
