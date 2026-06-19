@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 
-from src.audio.audio_event_detector import create_background_speech_event
+from src.audio.audio_event_detector import AUDIO_EVENT_DEFINITIONS, create_audio_event
 from src.camera.camera_stream import (
     camera_status_event,
     discover_camera_devices,
@@ -55,7 +55,7 @@ from src.utils.geodata import COUNTRIES, NIGERIA_LGAS, NIGERIA_STATES
 from src.vision.face_detector import analyse_face_presence
 from src.vision.visual_event_detector import (
     VISUAL_EVENT_DEFINITIONS,
-    create_event_from_face_detection,
+    create_events_from_frame_analysis,
     create_visual_event,
     is_visual_event,
 )
@@ -2151,30 +2151,45 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
                 st.rerun()
 
             with st.expander("Optional still-image face analysis", expanded=False):
-                st.caption("Upload a still image to run local prototype face-presence analysis without opening the camera.")
+                st.caption(
+                    "Upload a still image to run local OpenCV face analysis and optional YOLO object hooks without opening the camera. "
+                    "This mirrors the future FastAPI/OpenCV service boundary while keeping Streamlit as a control surface."
+                )
                 upload = st.file_uploader(
                     "Upload visual evidence image",
                     type=["jpg", "jpeg", "png"],
                     key=f"visual_upload_{session_id}",
                 )
+                run_yolo = st.checkbox(
+                    "Attempt optional YOLO object analysis if locally available",
+                    value=False,
+                    key=f"visual_yolo_{session_id}",
+                )
                 if upload and st.button("Analyse uploaded image", key=f"analyse_visual_upload_{session_id}"):
                     image_bytes = upload.getvalue()
                     result = analyse_face_presence(image_bytes)
                     evidence_path = store_visual_evidence(session_id, candidate_id, result.status, image_bytes)
-                    event = create_event_from_face_detection(
+                    analysis = create_events_from_frame_analysis(
                         session_id=session_id,
                         candidate_id=candidate_id,
-                        result=result,
+                        face_result=result,
                         camera_id="primary",
                         evidence_path=str(evidence_path),
+                        image_bytes=image_bytes,
+                        run_object_detection=run_yolo,
                     )
-                    save_event(event)
-                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
-                    if alert:
-                        save_alert(alert)
-                    log_audit(role, "visual_image_analysis_event", event.event_id, f"{event.event_type}; faces={result.face_count}")
+                    saved_event_types: list[str] = []
+                    for event in analysis.events:
+                        save_event(event)
+                        saved_event_types.append(event.event_type)
+                        alert = st.session_state.contextual_intelligence_engine.ingest(event)
+                        if alert:
+                            save_alert(alert)
+                        log_audit(role, "visual_image_analysis_event", event.event_id, f"{event.event_type}; faces={result.face_count}")
                     clear_app_caches()
-                    st.success(f"Image analysed and saved as {event.event_type}.")
+                    st.success(f"Image analysed and saved event(s): {', '.join(saved_event_types)}.")
+                    for note in analysis.detector_notes:
+                        st.caption(note)
                     st.rerun()
         else:
             st.info("Your role can view visual events but cannot generate prototype visual events.")
@@ -2605,15 +2620,23 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     visual_intelligence_panel(role, session_id, candidate_id)
 
     if has_permission(role, "generate_demo_events"):
-        st.write("Audio demo hook")
-        if st.button("Generate background speech event"):
-            event = create_background_speech_event(session_id, candidate_id)
+        st.write("Audio intelligence pipeline")
+        audio_label_to_type = {definition.label: definition.event_type for definition in AUDIO_EVENT_DEFINITIONS.values()}
+        selected_audio_label = st.selectbox(
+            "Audio event type",
+            list(audio_label_to_type),
+            key=f"audio_event_select_{session_id}",
+        )
+        if st.button("Generate selected audio evidence event"):
+            event = create_audio_event(session_id, candidate_id, audio_label_to_type[selected_audio_label])
             save_event(event)
             alert = st.session_state.contextual_intelligence_engine.ingest(event)
             if alert:
                 save_alert(alert)
+            log_audit(role, "monitoring_audio_event_generated", event.event_id, event.event_type)
             clear_app_caches()
-            st.success("Audio event generated and fused.")
+            st.success(f"Audio evidence event generated and stored: {event.event_type}.")
+            st.rerun()
     else:
         st.info("Your role cannot generate demo monitoring events.")
 

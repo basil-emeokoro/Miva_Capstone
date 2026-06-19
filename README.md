@@ -19,6 +19,7 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Mode A, B, and C monitoring configuration
 - Dual-camera stream status foundation using common event schema
 - Visual intelligence event foundation for face, camera, gaze/head-pose, person-count, and object-related evidence events
+- Live-detection integration foundation with OpenCV frame analysis, optional MediaPipe/YOLO-ready adapters, modular audio event definitions, and a FastAPI structured-event boundary
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
 - Contextual Intelligence Engine with Event Fusion Module, Temporal Behaviour Memory, Risk Scoring Engine, Contextual Reasoning Module, and Explainability Interface
@@ -52,6 +53,12 @@ python main.py
 python -m streamlit run app.py --server.port 8502
 ```
 
+Optional detector adapters can be installed separately when the local Python environment supports them:
+
+```powershell
+pip install ultralytics mediapipe
+```
+
 ## Known Limitations
 
 - This is not a production-grade proctoring platform.
@@ -63,6 +70,7 @@ python -m streamlit run app.py --server.port 8502
 - Streamlit tabs eagerly default to the first tab and do not provide full routed-page behaviour, so this prototype uses sidebar-controlled page navigation and session-state wizard steps for cleaner flow control.
 - Streamlit `st.camera_input` is not ideal for continuous AI-guided face movement detection and automatic pose capture. Production-grade capture should use `streamlit-webrtc`, a FastAPI/WebSocket + OpenCV video stream, or a dedicated React/WebRTC frontend so face landmarks can be inspected continuously and valid left/right/up/down/centre poses can be auto-captured.
 - Face recognition is implemented for enrolment/authentication, while advanced voice verification and object detection remain represented through prototype event flows.
+- OpenCV still-frame analysis is active for user-uploaded evidence. MediaPipe and YOLO are optional local adapters at this milestone; if unavailable, SERPS continues to use structured prototype hooks rather than failing at startup.
 - Prototype duplicate-face detection compares new face embeddings against saved enrolment templates, but it is not a production biometric de-duplication service.
 - The mock assessment is not a full exam engine.
 - RBAC is local prototype authorization only.
@@ -95,9 +103,19 @@ python -m streamlit run app.py --server.port 8502
 
 - The Monitoring page exposes visual intelligence controls for face presence, face absence, face obstruction, camera obstruction, multiple persons, looking away, head movement anomaly, mobile phone, and unauthorised object events.
 - Manual/prototype hooks generate structured visual events using the common `EvidenceEvent` schema and persist them in SQLite.
-- Optional still-image upload analysis performs local face/camera obstruction checks without opening the browser camera.
+- Optional still-image upload analysis performs local OpenCV face/camera obstruction checks without opening the browser camera.
+- Uploaded frames now pass through a service-style visual analysis pipeline that can emit face status, head-pose/gaze-position signals, and optional YOLO object evidence when the local YOLO stack is available.
 - The vision module generates evidence only. It does not classify malpractice or make final decisions.
 - Continuous visual monitoring remains a service-layer responsibility for later OpenCV, FastAPI, background worker, `streamlit-webrtc`, WebRTC, or secure exam-player integration.
+
+## Live AI Detection Integration Foundation
+
+- Visual detectors remain perception-only and emit `EvidenceEvent` objects for CIE ingestion.
+- OpenCV provides the current local face/camera obstruction analysis.
+- MediaPipe and YOLO are treated as optional live-AI adapters. They are not loaded on page startup and must be invoked behind user-triggered controls or service workers.
+- Audio intelligence now defines structured events for background speech, prolonged speech, abnormal silence, environmental noise, and suspicious audio patterns. Whisper, WebRTC VAD, Silero VAD, or equivalent detectors can be substituted later without changing the CIE contract.
+- `src/services/event_api.py` introduces a FastAPI structured-event API boundary so future camera/audio workers, secure exam players, or edge services can submit events without coupling inference to Streamlit.
+- Streamlit remains an operations dashboard and demo control surface. It is not the monitoring engine.
 
 ## Contextual Intelligence Engine
 

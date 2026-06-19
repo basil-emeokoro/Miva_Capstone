@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from src.fusion.event_schema import EvidenceEvent
 from src.vision.face_detector import FaceDetectionResult
+from src.vision.head_pose_estimator import estimate_head_pose_from_position
+from src.vision.object_detector import analyse_objects_with_yolo
 
 
 @dataclass(frozen=True)
@@ -16,6 +18,12 @@ class VisualEventDefinition:
     camera_id: str
     description: str
     prototype_only: bool = True
+
+
+@dataclass(frozen=True)
+class VisualFrameAnalysis:
+    events: list[EvidenceEvent]
+    detector_notes: list[str]
 
 
 VISUAL_EVENT_DEFINITIONS: dict[str, VisualEventDefinition] = {
@@ -154,6 +162,82 @@ def create_event_from_face_detection(
         camera_id=camera_id,
         confidence=result.confidence,
         description=result.description,
+        evidence_path=evidence_path,
+    )
+
+
+def create_events_from_frame_analysis(
+    session_id: str,
+    candidate_id: str,
+    face_result: FaceDetectionResult,
+    camera_id: str = "primary",
+    evidence_path: str | None = None,
+    image_bytes: bytes | None = None,
+    run_object_detection: bool = False,
+) -> VisualFrameAnalysis:
+    events = [
+        create_event_from_face_detection(
+            session_id=session_id,
+            candidate_id=candidate_id,
+            result=face_result,
+            camera_id=camera_id,
+            evidence_path=evidence_path,
+        )
+    ]
+    notes = [
+        f"OpenCV face detector: {face_result.status}; faces={face_result.face_count}; "
+        f"brightness={face_result.brightness:.1f}; sharpness={face_result.sharpness:.1f}"
+    ]
+    pose_event = _head_pose_event(session_id, candidate_id, face_result, camera_id, evidence_path)
+    if pose_event:
+        events.append(pose_event)
+        notes.append("Head-pose prototype emitted gaze/head-position evidence from face location.")
+    if run_object_detection and image_bytes:
+        for result in analyse_objects_with_yolo(image_bytes):
+            if not result.available:
+                notes.append(result.description)
+                continue
+            if result.event_type in VISUAL_EVENT_DEFINITIONS:
+                events.append(
+                    create_visual_event(
+                        session_id=session_id,
+                        candidate_id=candidate_id,
+                        event_type=result.event_type,
+                        camera_id=camera_id,
+                        confidence=result.confidence,
+                        description=result.description,
+                        evidence_path=evidence_path,
+                    )
+                )
+                notes.append(f"{result.model_name}: {result.description}")
+    return VisualFrameAnalysis(events=events, detector_notes=notes)
+
+
+def _head_pose_event(
+    session_id: str,
+    candidate_id: str,
+    face_result: FaceDetectionResult,
+    camera_id: str,
+    evidence_path: str | None,
+) -> EvidenceEvent | None:
+    if not face_result.face_box or not face_result.frame_shape or face_result.face_count != 1:
+        return None
+    x, y, width, height = face_result.face_box
+    frame_width, frame_height = face_result.frame_shape
+    if frame_width <= 0 or frame_height <= 0:
+        return None
+    face_center_x_ratio = (x + width / 2) / frame_width
+    face_center_y_ratio = (y + height / 2) / frame_height
+    pose = estimate_head_pose_from_position(face_center_x_ratio, face_center_y_ratio)
+    if pose.event_type == "face_present":
+        return None
+    return create_visual_event(
+        session_id=session_id,
+        candidate_id=candidate_id,
+        event_type=pose.event_type,
+        camera_id=camera_id,
+        confidence=pose.confidence,
+        description=pose.description,
         evidence_path=evidence_path,
     )
 

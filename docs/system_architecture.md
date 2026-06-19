@@ -23,10 +23,20 @@ The Contextual Intelligence Engine is the central reasoning layer. The Event Fus
 
 - Python
 - Streamlit dashboard
+- FastAPI structured-event service boundary
 - SQLite database
+- OpenCV still-frame visual analysis
+- Optional MediaPipe/YOLO-ready detector adapters
+- Modular audio event definitions for future VAD/STT detectors
 - Contextual intelligence with event fusion, temporal behaviour memory, risk scoring, contextual reasoning, and explainability
 - JSON report export
 - Pytest tests
+
+## Frozen Architecture Boundary
+
+Detection modules are perception modules only. They generate immutable structured `EvidenceEvent` records for the Contextual Intelligence Engine. They must not calculate final misconduct decisions or bypass CIE risk reasoning.
+
+Streamlit is the dashboard/control surface. Continuous AI inference should run through service boundaries such as FastAPI, OpenCV workers, WebRTC/browser streams, or a secure exam-player integration. The first live-integration milestone introduces this boundary through `src/services/event_api.py`.
 
 ## Monitoring Modes
 

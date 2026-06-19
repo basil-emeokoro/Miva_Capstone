@@ -4,6 +4,7 @@ import numpy as np
 from src.vision.face_detector import analyse_face_presence
 from src.vision.visual_event_detector import (
     VISUAL_EVENT_DEFINITIONS,
+    create_events_from_frame_analysis,
     create_event_from_face_detection,
     create_visual_event,
     is_visual_event,
@@ -51,3 +52,18 @@ def test_dark_image_generates_camera_obstructed_event() -> None:
     assert result.status == "camera_obstructed"
     assert event.event_type == "camera_obstructed"
     assert event.source_module == "primary_camera"
+
+
+def test_frame_analysis_emits_structured_face_event() -> None:
+    image = np.zeros((120, 160, 3), dtype=np.uint8)
+    ok, encoded = cv2.imencode(".jpg", image)
+    assert ok
+
+    result = analyse_face_presence(encoded.tobytes())
+    analysis = create_events_from_frame_analysis("SESSION-1", "CAND-1", result, image_bytes=encoded.tobytes())
+
+    assert analysis.events
+    assert analysis.events[0].event_type == "camera_obstructed"
+    assert analysis.events[0].session_id == "SESSION-1"
+    assert analysis.events[0].candidate_id == "CAND-1"
+    assert "OpenCV face detector" in analysis.detector_notes[0]

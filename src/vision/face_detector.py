@@ -14,6 +14,8 @@ class FaceDetectionResult:
     status: str
     confidence: float
     description: str
+    face_box: tuple[int, int, int, int] | None = None
+    frame_shape: tuple[int, int] | None = None
 
 
 def analyse_face_presence(image_bytes: bytes) -> FaceDetectionResult:
@@ -21,10 +23,17 @@ def analyse_face_presence(image_bytes: bytes) -> FaceDetectionResult:
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     if image is None:
         return FaceDetectionResult(0, 0.0, 0.0, "camera_obstructed", 0.8, "Image could not be decoded.")
+    return analyse_face_presence_frame(image)
 
+
+def analyse_face_presence_frame(image: np.ndarray) -> FaceDetectionResult:
+    """Analyse a decoded OpenCV frame without opening any camera device."""
+    if image is None or image.size == 0:
+        return FaceDetectionResult(0, 0.0, 0.0, "camera_obstructed", 0.8, "Image frame is empty.")
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     brightness = float(np.mean(gray))
     sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    frame_shape = (int(image.shape[1]), int(image.shape[0]))
     if brightness < 25 or sharpness < 8:
         return FaceDetectionResult(
             0,
@@ -33,11 +42,12 @@ def analyse_face_presence(image_bytes: bytes) -> FaceDetectionResult:
             "camera_obstructed",
             0.78,
             "Camera view appears too dark, blurred, or obstructed for reliable monitoring.",
+            frame_shape=frame_shape,
         )
 
     faces = _detect_faces(gray)
     if len(faces) == 0:
-        return FaceDetectionResult(0, brightness, sharpness, "face_absent", 0.82, "No candidate face detected.")
+        return FaceDetectionResult(0, brightness, sharpness, "face_absent", 0.82, "No candidate face detected.", frame_shape=frame_shape)
     if len(faces) > 1:
         return FaceDetectionResult(
             len(faces),
@@ -46,6 +56,8 @@ def analyse_face_presence(image_bytes: bytes) -> FaceDetectionResult:
             "multiple_persons_detected",
             0.86,
             "More than one face was detected in the camera frame.",
+            face_box=faces[0],
+            frame_shape=frame_shape,
         )
     if sharpness < 20:
         return FaceDetectionResult(
@@ -55,8 +67,10 @@ def analyse_face_presence(image_bytes: bytes) -> FaceDetectionResult:
             "face_obstructed",
             0.7,
             "Candidate face is visible but partially blurred or obstructed.",
+            face_box=faces[0],
+            frame_shape=frame_shape,
         )
-    return FaceDetectionResult(1, brightness, sharpness, "face_present", 0.9, "One candidate face is visible.")
+    return FaceDetectionResult(1, brightness, sharpness, "face_present", 0.9, "One candidate face is visible.", face_box=faces[0], frame_shape=frame_shape)
 
 
 def _detect_faces(gray: np.ndarray) -> list[tuple[int, int, int, int]]:

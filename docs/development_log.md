@@ -98,6 +98,17 @@
 - Added temporal window sensitivity support for 30-second, 2-minute, and 5-minute windows.
 - Expanded unit tests for isolated-event suppression, repeated-event escalation, multimodal escalation, duplicate suppression, temporal-window sensitivity, explanation completeness, reviewer recommendation, and raw-event immutability.
 
+## Live AI Detection Integration Foundation
+
+- Began replacing manual-only visual/audio event generation with service-ready detector modules that still emit only structured `EvidenceEvent` records.
+- Extended OpenCV face analysis so decoded frames can be analysed without opening camera hardware and can provide face box/frame metadata for prototype head-pose signalling.
+- Added a visual frame-analysis pipeline that can emit face presence/absence/obstruction, camera obstruction, head-pose/gaze-position, and optional object-detection events from a single uploaded frame.
+- Added a lazy optional YOLO adapter for mobile-phone and unauthorised-object evidence. The adapter does not load on page startup and returns a clean unavailable diagnostic when the local YOLO stack/model is absent.
+- Added modular audio event definitions for background speech, prolonged speech, abnormal silence, environmental noise, and suspicious audio patterns, keeping Whisper/WebRTC VAD/Silero VAD replaceable behind the same event contract.
+- Added a FastAPI structured-event API boundary so future OpenCV, MediaPipe, YOLO, audio, WebRTC, or exam-player services can submit events without coupling inference to Streamlit.
+- Updated Monitoring so uploaded still images can run through the visual analysis pipeline and audio events can be selected from the modular audio event set.
+- Preserved the camera privacy rule: no camera opens on page load, and Streamlit remains the operations dashboard rather than the inference engine.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.
