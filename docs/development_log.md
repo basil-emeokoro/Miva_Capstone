@@ -54,7 +54,7 @@
 - Added camera readiness status cards and manual stream-health event hooks on the Monitoring page.
 - Exposed the camera foundation directly in Monitoring through an active/reporting session selector, monitoring-mode display, primary/secondary selectors, requirement indicators, status cards, readiness events, missing-camera events, disconnected-camera events, and a recent camera/system events table.
 - Persisted camera/system events through the common SQLite `events` table using the shared evidence-event schema.
-- Prepared missing/disconnected camera events for Event Fusion Engine ingestion while keeping camera modules advisory only.
+- Prepared missing/disconnected camera events for Contextual Intelligence Engine ingestion while keeping camera modules advisory only.
 - Preserved the privacy rule that no camera opens on page load.
 - Documented that Streamlit is only the dashboard/control surface. Continuous dual-camera monitoring should move to service boundaries such as `streamlit-webrtc`, FastAPI/OpenCV, background workers, WebRTC/browser streams, or secure exam-player event ingestion.
 
@@ -63,20 +63,31 @@
 - Added modular vision files for face presence analysis, prototype head-pose signalling, object-detection hooks, and visual evidence-event creation.
 - Added required visual event types: `face_present`, `face_absent`, `face_obstructed`, `camera_obstructed`, `multiple_persons_detected`, `looking_away`, `head_movement_anomaly`, `mobile_phone_detected`, and `unauthorised_object_detected`.
 - Exposed a Visual Intelligence Foundation panel in Monitoring with selected session context, primary/secondary camera context, manual visual event hooks, optional still-image face analysis, and recent visual events.
-- Persisted visual events through the common SQLite `events` table using the shared `EvidenceEvent` schema so Reports and the Event Fusion Engine can consume them.
+- Persisted visual events through the common SQLite `events` table using the shared `EvidenceEvent` schema so Reports and the Contextual Intelligence Engine can consume them.
 - Preserved the rule that no camera opens on page load; real continuous visual analysis remains a future service-layer integration.
 - Kept visual intelligence advisory only. Human review remains responsible for final decisions.
 
-## Multi-Modal Event Fusion Engine
+## Multi-Modal Event Fusion Engine Foundation
 
 - Extended the fusion engine into a Streamlit-independent intelligence layer that can correlate persisted SQLite evidence events across configurable time windows.
 - Added modular prototype rules for primary-camera avoidance, possible third-party assistance, unauthorised presence, reduced monitoring confidence, and high-risk behavioural patterns.
 - Added duplicate suppression by event signature, weighted confidence aggregation, current risk score, rolling risk score, risk trend, risk-level classification, contributing modules, and reasoning trace.
 - Migrated the `fused_alerts` table with confidence, current/rolling score, risk trend, contributing modules, and reasoning trace fields while keeping raw evidence events immutable.
-- Exposed fusion status, risk score, trend, explanation preview, recent fused alerts, and a user-triggered stored-event fusion action in Monitoring.
+- Exposed risk score, trend, explanation preview, recent fused alerts, and a user-triggered stored-event fusion action in Monitoring.
 - Updated Reports to show raw events, fused alerts, fusion timeline, risk trend, and contributing-module summaries.
 - Updated Review so human reviewers inspect explainable fused alerts and supporting raw events rather than isolated event rows only.
 - Preserved the rule that fusion does not make final misconduct decisions; it prepares explainable risk assessments for human review and later orchestration.
+
+## Contextual Intelligence Engine Refinement
+
+- Adopted the Contextual Intelligence Engine (CIE) as the primary SERPS reasoning layer following Addenda 3 and 4.
+- Preserved the existing Event Fusion Engine work as the CIE Event Fusion Module instead of deleting or duplicating useful logic.
+- Added CIE submodules for Event Fusion, Temporal Behaviour Memory, Risk Scoring, Contextual Reasoning, and Explainability Interface.
+- Added temporal behaviour memory summaries so CIE can distinguish isolated events from persistent behavioural patterns.
+- Added contextual risk adjustment hooks that consider event frequency, module diversity, persistent behaviour, and a future reviewer-feedback placeholder.
+- Updated Monitoring wording to show CIE status while keeping the Event Fusion Module visible as a subcomponent.
+- Updated Review and Reports wording to use CIE-generated contextual/fused alerts, risk timeline, and temporal behaviour summaries.
+- Updated architecture documentation to show the revised pipeline: Sensors, Detection Modules, Structured Event Generation, CIE, Agentic Decision Support, Human Reviewer, Final Decision.
 
 ## Load-Time Optimisation Notes
 
@@ -92,7 +103,7 @@
 3. Candidate authenticates before session start.
 4. Candidate starts the mock assessment.
 5. Monitoring module generates normal and suspicious visual/audio/identity events.
-6. Event Fusion Engine generates explainable fused alerts.
+6. Contextual Intelligence Engine generates explainable contextual/fused alerts.
 7. Agentic AI orchestration foundation prioritises and routes alert actions.
 8. Human reviewer accepts, rejects, or escalates.
 9. Report is generated for the session.

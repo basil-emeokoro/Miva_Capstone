@@ -25,7 +25,7 @@ from src.enrolment.face_enrolment import (
     list_face_samples,
     record_face_sample,
 )
-from src.fusion.fusion_engine import FusionEngine
+from src.contextual_intelligence.contextual_intelligence_engine import ContextualIntelligenceEngine
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
 from src.security.access_control import Role, has_permission
@@ -81,8 +81,8 @@ st.set_page_config(
 )
 initialize_database()
 
-if "fusion_engine" not in st.session_state:
-    st.session_state.fusion_engine = FusionEngine()
+if "contextual_intelligence_engine" not in st.session_state:
+    st.session_state.contextual_intelligence_engine = ContextualIntelligenceEngine()
 
 
 @st.cache_data(show_spinner=False)
@@ -466,7 +466,7 @@ def render_hero() -> None:
                 <div class="hero-copy">
                     <span class="brand">SERPS</span>
                     <h1>Secure Remote-Proctored Assessment Console</h1>
-                    <p>Explainable multi-modal monitoring, identity assurance, event fusion, and human-supervised review.</p>
+                    <p>Explainable multi-modal monitoring, identity assurance, contextual intelligence, and human-supervised review.</p>
                 </div>
             </div>
         </div>
@@ -487,7 +487,7 @@ def home_page() -> None:
         ("Session Control", "Run mode selection, device checks, authentication, and session start gates."),
         ("Test Player", "Demonstrate assessment delivery with proctoring-focused sample questions."),
         ("Monitoring", "Generate structured demo events for visual, identity, and audio intelligence."),
-        ("Review", "Inspect explainable fused alerts and record human-supervised decisions."),
+        ("Review", "Inspect CIE-generated alerts and record human-supervised decisions."),
         ("Reports", "Filter session data and export JSON evidence reports."),
     ]
     cards = "".join(f'<div class="module-card"><strong>{title}</strong><span>{body}</span></div>' for title, body in modules)
@@ -499,7 +499,7 @@ def home_page() -> None:
                 <div class="hero-copy">
                     <span class="brand">SERPS</span>
                     <h1>Secure Remote-Proctored Assessment Console</h1>
-                    <p>Secure Explainable Remote Proctoring System for identity assurance, multi-modal monitoring, event fusion, and human-supervised review.</p>
+                    <p>Secure Explainable Remote Proctoring System for identity assurance, multi-modal monitoring, contextual intelligence, and human-supervised review.</p>
                 </div>
             </div>
         </div>
@@ -1931,7 +1931,7 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
                         f"{target_camera.title()} camera is missing from the current monitoring setup.",
                     )
                     save_event(event)
-                    alert = st.session_state.fusion_engine.ingest(event)
+                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
                     if alert:
                         save_alert(alert)
                     log_audit(role, "camera_missing_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
@@ -1949,14 +1949,14 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
                         f"{target_camera.title()} camera stream disconnected during monitoring.",
                     )
                     save_event(event)
-                    alert = st.session_state.fusion_engine.ingest(event)
+                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
                     if alert:
                         save_alert(alert)
                     log_audit(role, "camera_disconnected_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
                     clear_app_caches()
                     st.warning(f"Saved disconnected-camera event for {target_camera} camera.")
                     st.rerun()
-            st.caption("Readiness, missing, and disconnected events are persisted for event-stream continuity and later fusion/orchestration use.")
+            st.caption("Readiness, missing, and disconnected events are persisted for CIE event-stream continuity and later orchestration use.")
 
             with st.expander("Manual camera health event hooks", expanded=False):
                 st.caption("These hooks simulate stream health events without object detection or malpractice decisions.")
@@ -1988,7 +1988,7 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
                     event = manual_camera_health_event(session_id, candidate_id, camera_id, event_type, description)
                     save_event(event)
                     if event_type in {"camera_stream_disconnected", "camera_stream_missing"}:
-                        alert = st.session_state.fusion_engine.ingest(event)
+                        alert = st.session_state.contextual_intelligence_engine.ingest(event)
                         if alert:
                             save_alert(alert)
                     log_audit(role, "camera_health_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
@@ -2051,7 +2051,7 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
             if st.button("Generate selected visual evidence event", key=f"generate_visual_event_{session_id}"):
                 event = create_visual_event(session_id, candidate_id, label_to_type[selected_label], camera_id=selected_camera)
                 save_event(event)
-                alert = st.session_state.fusion_engine.ingest(event)
+                alert = st.session_state.contextual_intelligence_engine.ingest(event)
                 if alert:
                     save_alert(alert)
                 log_audit(role, "visual_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
@@ -2078,7 +2078,7 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
                         evidence_path=str(evidence_path),
                     )
                     save_event(event)
-                    alert = st.session_state.fusion_engine.ingest(event)
+                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
                     if alert:
                         save_alert(alert)
                     log_audit(role, "visual_image_analysis_event", event.event_id, f"{event.event_type}; faces={result.face_count}")
@@ -2096,12 +2096,12 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
             st.info("No visual intelligence events have been recorded for this session yet.")
 
 
-def fusion_engine_panel(role: str, session_id: str, candidate_id: str) -> None:
+def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> None:
     with st.container(border=True):
-        st.markdown("#### Multi-Modal Event Fusion Engine")
+        st.markdown("#### Contextual Intelligence Engine")
         st.caption(
-            "Fusion correlates stored evidence events across camera, audio, identity, behaviour, device, and session modules. "
-            "It produces explainable risk assessments for human review, not misconduct decisions."
+            "CIE is the central SERPS reasoning layer. Its Event Fusion Module correlates stored evidence events, "
+            "Temporal Behaviour Memory distinguishes isolated events from persistent patterns, and explainability prepares reviewer-facing reasoning."
         )
         events = cached_events(session_id)
         alerts = cached_alerts(session_id)
@@ -2109,7 +2109,7 @@ def fusion_engine_panel(role: str, session_id: str, candidate_id: str) -> None:
 
         col_status, col_current, col_trend, col_modules = st.columns(4)
         with col_status:
-            st.metric("Fusion status", "Ready" if events else "Waiting for evidence")
+            st.metric("CIE status", "Ready" if events else "Waiting for evidence")
             st.caption(f"{len(events)} raw event(s) available")
         with col_current:
             st.metric("Current risk score", latest_alert.get("current_risk_score", 0) if latest_alert else 0)
@@ -2126,25 +2126,25 @@ def fusion_engine_panel(role: str, session_id: str, candidate_id: str) -> None:
                 st.caption(", ".join(modules))
 
         if latest_alert:
-            st.write("Fusion explanation preview")
+            st.write("CIE explanation preview")
             st.info(str(latest_alert.get("explanation", "")))
         else:
-            st.info("Generate visual, audio, identity, or camera events, then run fusion for the selected time window.")
+            st.info("Generate visual, audio, identity, or camera events, then run CIE analysis for the selected temporal window.")
 
         if has_permission(role, "generate_demo_events"):
             col_window, col_run = st.columns([2, 1])
             with col_window:
                 window_seconds = st.selectbox(
-                    "Fusion time window",
+                    "CIE temporal window",
                     [5, 10, 30],
                     index=2,
                     format_func=lambda value: f"Last {value} seconds",
-                    key=f"fusion_window_{session_id}",
+                    key=f"cie_window_{session_id}",
                 )
             with col_run:
                 st.write("")
-                if st.button("Run fusion on stored events", key=f"run_fusion_{session_id}"):
-                    alert = st.session_state.fusion_engine.fuse_recent(session_id, int(window_seconds))
+                if st.button("Run CIE analysis on stored events", key=f"run_cie_{session_id}"):
+                    alert = st.session_state.contextual_intelligence_engine.fuse_recent(session_id, int(window_seconds))
                     if alert:
                         save_alert(alert)
                         log_audit(
@@ -2154,14 +2154,14 @@ def fusion_engine_panel(role: str, session_id: str, candidate_id: str) -> None:
                             f"{alert.alert_type}; risk={alert.risk_score}; confidence={alert.confidence}",
                         )
                         clear_app_caches()
-                        st.success(f"Fused alert generated: {alert.alert_id} ({alert.risk_level}).")
+                        st.success(f"CIE-generated alert saved: {alert.alert_id} ({alert.risk_level} Risk).")
                         st.rerun()
                     else:
-                        st.info("No actionable fused alert was generated for the selected time window.")
+                        st.info("No actionable contextual alert was generated for the selected temporal window.")
         else:
-            st.info("Your role can inspect fused alerts but cannot trigger prototype fusion.")
+            st.info("Your role can inspect CIE alerts but cannot trigger prototype contextual analysis.")
 
-        st.write("Recent fused alerts")
+        st.write("Recent contextual/fused alerts")
         if alerts:
             alert_frame = pd.DataFrame(alerts)
             preferred_columns = [
@@ -2179,7 +2179,7 @@ def fusion_engine_panel(role: str, session_id: str, candidate_id: str) -> None:
             display_columns = [column for column in preferred_columns if column in alert_frame.columns]
             st.dataframe(alert_frame[display_columns], use_container_width=True, hide_index=True)
         else:
-            st.info("No fused alerts have been generated for this session yet.")
+            st.info("No contextual/fused alerts have been generated for this session yet.")
 
 
 def store_visual_evidence(session_id: str, candidate_id: str, event_type: str, image_bytes: bytes) -> Path:
@@ -2206,7 +2206,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
         if st.button("Generate background speech event"):
             event = create_background_speech_event(session_id, candidate_id)
             save_event(event)
-            alert = st.session_state.fusion_engine.ingest(event)
+            alert = st.session_state.contextual_intelligence_engine.ingest(event)
             if alert:
                 save_alert(alert)
             clear_app_caches()
@@ -2214,7 +2214,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     else:
         st.info("Your role cannot generate demo monitoring events.")
 
-    fusion_engine_panel(role, session_id, candidate_id)
+    contextual_intelligence_panel(role, session_id, candidate_id)
 
     events = cached_events(session_id)
     if events:
@@ -2224,23 +2224,23 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
 
 
 def alert_review_panel(role: str, session_id: str | None) -> None:
-    st.subheader("Fused Alerts and Human Review")
+    st.subheader("CIE-Generated Alerts and Human Review")
     if not session_id:
         st.info("Select a session to review alerts.")
         return
 
     alerts = cached_alerts(session_id)
     if not alerts:
-        st.info("No fused alerts yet.")
+        st.info("No CIE-generated alerts yet.")
         return
 
     alert_frame = pd.DataFrame(alerts)
     st.dataframe(alert_frame, use_container_width=True)
     alert_ids = [str(alert["alert_id"]) for alert in alerts]
-    alert_id = st.selectbox("Fused alert case", alert_ids, key="review_alert_case_select")
+    alert_id = st.selectbox("CIE-generated alert case", alert_ids, key="review_alert_case_select")
     selected_alert = next(alert for alert in alerts if str(alert["alert_id"]) == alert_id)
 
-    st.write("Explainable alert detail")
+    st.write("CIE-generated alert detail")
     col_level, col_current, col_rolling, col_confidence = st.columns(4)
     with col_level:
         st.metric("Suggested risk level", str(selected_alert.get("risk_level", "Low")))
@@ -2325,13 +2325,13 @@ def reports_panel(role: str, session_id: str | None) -> None:
     else:
         st.info("No events match the selected filters.")
 
-    st.write("Table 2: Filtered Fused Alerts")
+    st.write("Table 2: Filtered Contextual/Fused Alerts")
     if filtered_alerts:
         st.dataframe(pd.DataFrame(filtered_alerts), use_container_width=True)
     else:
-        st.info("No fused alerts match the selected filters.")
+        st.info("No contextual/fused alerts match the selected filters.")
 
-    st.write("Fusion Timeline")
+    st.write("Risk Timeline")
     if filtered_alerts:
         timeline_columns = [
             "alert_id",
@@ -2352,9 +2352,9 @@ def reports_panel(role: str, session_id: str | None) -> None:
             hide_index=True,
         )
     else:
-        st.info("No fusion timeline is available for the selected filters.")
+        st.info("No risk timeline is available for the selected filters.")
 
-    st.write("Risk Trend")
+    st.write("Temporal Behaviour Summary")
     if filtered_alerts:
         trend_rows = [
             {

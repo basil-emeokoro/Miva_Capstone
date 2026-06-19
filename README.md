@@ -4,11 +4,11 @@ Local-first capstone prototype for secure remote-proctored assessments in Nigeri
 
 Platform identity: SERPS - Secure Explainable Remote Proctoring System.
 
-The system demonstrates candidate enrolment, consent capture, monitoring-mode selection, mock assessment delivery, structured event generation, explainable event fusion, role-aware human review, and report export.
+The system demonstrates candidate enrolment, consent capture, monitoring-mode selection, mock assessment delivery, structured event generation, contextual intelligence, role-aware human review, and report export.
 
 ## Core Principle
 
-AI modules do not punish candidates. Detection modules generate evidence events, the Event Fusion Engine assigns explainable risk, and a human reviewer makes the final decision.
+AI modules do not punish candidates. Detection modules generate evidence events, the Contextual Intelligence Engine assigns explainable risk through event fusion, temporal memory, contextual reasoning, and risk scoring. A human reviewer makes the final decision.
 
 ## Prototype Features
 
@@ -21,7 +21,7 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Visual intelligence event foundation for face, camera, gaze/head-pose, person-count, and object-related evidence events
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
-- Rule-based multi-modal Event Fusion Engine with time-window correlation, duplicate suppression, risk scoring, confidence aggregation, and explainable fused alerts
+- Contextual Intelligence Engine with Event Fusion Module, Temporal Behaviour Memory, Risk Scoring Engine, Contextual Reasoning Module, and Explainability Interface
 - Reviewer accept/reject/escalate workflow
 - JSON session report export
 - SQLite local storage
@@ -39,7 +39,7 @@ For local demonstration, the same machine may simulate both dashboard staff acti
 3. Candidate authenticates before session start.
 4. Candidate starts the mock assessment.
 5. Monitoring modules generate normal and suspicious demo events.
-6. The Event Fusion Engine produces explainable fused alerts.
+6. The Contextual Intelligence Engine produces explainable contextual/fused alerts.
 7. The Agentic AI orchestration foundation prioritises and routes the alerts.
 8. Human reviewer accepts, rejects, or escalates the alert.
 9. A session report is generated.
@@ -87,7 +87,7 @@ python -m streamlit run app.py --server.port 8502
 - The Monitoring page exposes primary and secondary camera slots without activating camera hardware.
 - Monitoring includes an active/reporting session selector, monitoring-mode display, primary/secondary selectors, requirement cards, readiness status cards, and manual readiness/missing/disconnected event hooks.
 - Camera readiness and health events are persisted through the same SQLite `events` table used by visual, audio, identity, and behavioural events.
-- Camera events use the common evidence-event schema and are ready for Event Fusion Engine ingestion.
+- Camera events use the common evidence-event schema and are ready for Contextual Intelligence Engine ingestion.
 - Streamlit remains the UI/control shell for dashboards, manual prototype hooks, review, and report preview. It is not the real monitoring engine.
 - Continuous monitoring should be driven later by service boundaries such as FastAPI endpoints, OpenCV/background workers, `streamlit-webrtc`, WebRTC/browser streams, or an external secure exam-player integration.
 
@@ -99,16 +99,20 @@ python -m streamlit run app.py --server.port 8502
 - The vision module generates evidence only. It does not classify malpractice or make final decisions.
 - Continuous visual monitoring remains a service-layer responsibility for later OpenCV, FastAPI, background worker, `streamlit-webrtc`, WebRTC, or secure exam-player integration.
 
-## Multi-Modal Event Fusion Engine
+## Contextual Intelligence Engine
 
-- The fusion engine reads immutable raw `EvidenceEvent` records from SQLite and correlates them within configurable windows such as 5, 10, or 30 seconds.
-- Prototype fusion rules currently cover primary-camera avoidance, possible third-party assistance, unauthorised presence, reduced monitoring confidence, and high-risk behavioural patterns.
-- Fused alerts store contributing events, contributing modules, current risk score, rolling risk score, risk trend, confidence, explanation, recommended reviewer action, and reasoning trace.
+Addenda 3 and 4 elevate the previous Event Fusion Engine into a broader Contextual Intelligence Engine (CIE). This is a controlled refinement, not an architectural redesign. The Event Fusion Module remains visible as a CIE subcomponent.
+
+- The CIE reads immutable raw `EvidenceEvent` records from SQLite and correlates them within configurable windows such as 5, 10, or 30 seconds.
+- The Event Fusion Module provides prototype rules for primary-camera avoidance, possible third-party assistance, unauthorised presence, reduced monitoring confidence, and high-risk behavioural patterns.
+- Temporal Behaviour Memory distinguishes isolated events from persistent patterns across recent monitoring windows.
+- The Risk Scoring Engine computes continuous confidence-based current and rolling risk scores.
+- Contextual/fused alerts store contributing events, contributing modules, current risk score, rolling risk score, risk trend, confidence, explanation, recommended reviewer action, and reasoning trace.
 - Raw evidence events are not overwritten. Fused alerts are separate review objects for human-supervised decision-making.
-- The Monitoring page exposes fusion status, current/rolling risk, trend, contributing modules, explanation preview, and recent fused alerts.
-- Reports expose raw events, fused alerts, fusion timeline, risk trend, and contributing-module summaries.
-- The Review page presents fused alerts as explainable cases with supporting raw events before reviewer accept/reject/escalate decisions.
-- The fusion module is independent of Streamlit and can be called from future FastAPI services, background workers, a secure exam player, or unit tests.
+- The Monitoring page exposes CIE status, current/rolling risk, trend, contributing modules, explanation preview, and recent contextual/fused alerts.
+- Reports expose raw events, contextual/fused alerts, risk timeline, temporal behaviour summary, and contributing-module summaries.
+- The Review page presents CIE-generated alerts as explainable cases with supporting raw events before reviewer accept/reject/escalate decisions.
+- The CIE is independent of Streamlit and can be called from future FastAPI services, background workers, a secure exam player, or unit tests.
 
 ## Monitoring Roadmap
 
