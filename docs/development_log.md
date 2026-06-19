@@ -109,6 +109,13 @@
 - Updated Monitoring so uploaded still images can run through the visual analysis pipeline and audio events can be selected from the modular audio event set.
 - Preserved the camera privacy rule: no camera opens on page load, and Streamlit remains the operations dashboard rather than the inference engine.
 
+## CIE Monitoring UI Refinement
+
+- Replaced the CIE Live Event Stream HTML renderer with native Streamlit containers, columns, metrics, captions, and dividers so raw HTML source is never displayed to the panel.
+- Updated CIE display metrics so older contextual alerts without stored confidence/current-score values derive coherent confidence and risk display values from contributing raw evidence.
+- Made reviewer recommendation labels dynamic from risk level: Low = Observe, Medium = Warn, High = Escalate, Critical = Immediate Human Review.
+- Reworked contextual correlation into grouped evidence sections for camera health, visual intelligence, audio intelligence, object detection, identity, and system evidence while preserving technical tables in expanders.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.

@@ -256,95 +256,6 @@ def apply_theme() -> None:
             padding: 1rem;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
         }
-        .cie-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(120px, 1fr));
-            gap: .75rem;
-            margin: .9rem 0 1rem 0;
-        }
-        .cie-card {
-            background: #ffffff;
-            border: 1px solid #cfe0ea;
-            border-radius: 8px;
-            padding: .85rem;
-            min-height: 96px;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, .04);
-        }
-        .cie-card span {
-            display: block;
-            color: #557086;
-            font-size: .78rem;
-            margin-bottom: .35rem;
-        }
-        .cie-card strong {
-            display: block;
-            color: #0f172a;
-            font-size: 1.35rem;
-            line-height: 1.2;
-        }
-        .cie-stage {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(120px, 1fr));
-            gap: .5rem;
-            margin: .75rem 0 1rem 0;
-        }
-        .cie-stage div {
-            background: #e8f7f5;
-            color: #064e5f;
-            border: 1px solid #b9e4de;
-            border-radius: 8px;
-            padding: .65rem;
-            text-align: center;
-            font-weight: 700;
-            font-size: .86rem;
-        }
-        .cie-timeline {
-            border-left: 3px solid #0a7f78;
-            padding-left: .75rem;
-            margin: .4rem 0 1rem 0;
-        }
-        .cie-event {
-            display: flex;
-            align-items: center;
-            gap: .65rem;
-            background: #ffffff;
-            border: 1px solid #d7e2eb;
-            border-radius: 8px;
-            padding: .55rem .7rem;
-            margin-bottom: .4rem;
-        }
-        .cie-event time {
-            color: #557086;
-            font-size: .78rem;
-            min-width: 56px;
-        }
-        .cie-chip {
-            display: inline-block;
-            background: #e8f7f5;
-            border: 1px solid #b9e4de;
-            border-radius: 999px;
-            color: #075a75;
-            padding: .35rem .6rem;
-            margin: .15rem .25rem .15rem 0;
-            font-weight: 700;
-            font-size: .86rem;
-        }
-        .cie-explanation {
-            background: #eef7ff;
-            border: 1px solid #b9d9ee;
-            border-radius: 8px;
-            padding: .9rem 1rem;
-            color: #064e7a;
-            margin: .5rem 0;
-        }
-        .cie-recommendation {
-            background: #fff8dc;
-            border-left: 5px solid #f5b400;
-            border-radius: 8px;
-            padding: .9rem 1rem;
-            color: #704b00;
-            margin: .5rem 0;
-        }
         .module-grid {
             display: grid;
             grid-template-columns: repeat(4, minmax(150px, 1fr));
@@ -2235,18 +2146,25 @@ def reviewer_action_label(alert: dict[str, object] | None) -> str:
         return "Observe"
     risk_level = str(alert.get("risk_level", "Low"))
     if risk_level == "Critical":
-        return "Escalate"
+        return "Immediate Human Review"
     if risk_level == "High":
-        return "Warn / Escalate"
+        return "Escalate"
     if risk_level == "Medium":
-        return "Observe / Warn"
-    return "Ignore / No Action"
+        return "Warn"
+    return "Observe"
 
 
 def recommendation_text(alert: dict[str, object] | None) -> str:
     if not alert:
         return "Observe the session and wait for structured evidence before taking action."
-    return str(alert.get("recommended_action") or "Observe and continue monitoring. Human reviewer remains final decision-maker.")
+    risk_level = str(alert.get("risk_level", "Low"))
+    if risk_level == "Critical":
+        return "Immediate human review is recommended because contextual risk is critical. Do not make an automatic misconduct decision."
+    if risk_level == "High":
+        return "Escalate to a reviewer or senior proctor and continue preserving supporting evidence."
+    if risk_level == "Medium":
+        return "Warn or closely observe the candidate, then review whether the pattern persists."
+    return "Observe and continue monitoring. Human reviewer remains final decision-maker."
 
 
 def latest_alert_for_session(session_id: str) -> dict[str, object] | None:
@@ -2254,15 +2172,79 @@ def latest_alert_for_session(session_id: str) -> dict[str, object] | None:
     return alerts[0] if alerts else None
 
 
-def correlation_summary(events: list[dict[str, object]], alert: dict[str, object] | None) -> dict[str, object]:
-    frequency: dict[str, int] = {}
-    for event in events:
-        label = event_display_name(event.get("event_type"))
-        frequency[label] = frequency.get(label, 0) + 1
+def resolved_alert_metrics(alert: dict[str, object] | None, events: list[dict[str, object]]) -> dict[str, object]:
+    if not alert:
+        return {"risk_score": 0, "risk_level": "Low", "confidence": 0.0, "trend": "Stable"}
+    risk_score = int(alert.get("current_risk_score") or alert.get("risk_score") or 0)
+    risk_level = str(alert.get("risk_level", "Low"))
+    confidence = float(alert.get("confidence") or 0)
+    contributing_ids = set(ensure_list(alert.get("contributing_events")))
+    contributing_events = [
+        event
+        for event in events
+        if not contributing_ids or str(event.get("event_id")) in contributing_ids
+    ]
+    if confidence <= 0 and risk_level != "Low":
+        contributing_confidences = [
+            float(event.get("confidence") or 0)
+            for event in contributing_events
+        ]
+        if contributing_confidences:
+            confidence = max(contributing_confidences)
+    if risk_score <= 0 and risk_level != "Low" and contributing_events:
+        risk_score = min(
+            100,
+            sum(
+                round(float(event.get("risk_weight") or 0) * float(event.get("confidence") or 0) * 100)
+                for event in contributing_events
+            ),
+        )
     return {
-        "frequency": frequency,
-        "confidence": alert.get("confidence", 0) if alert else 0,
-        "risk": alert.get("risk_level", "Low") if alert else "Low",
+        "risk_score": risk_score,
+        "risk_level": risk_level,
+        "confidence": confidence,
+        "trend": str(alert.get("risk_trend", "stable")).title(),
+    }
+
+
+def event_group_name(event: dict[str, object]) -> str:
+    event_type = str(event.get("event_type", ""))
+    source_module = str(event.get("source_module", ""))
+    if event_type.startswith("camera_"):
+        return "Camera Health"
+    if source_module == "audio":
+        return "Audio Intelligence"
+    if event_type in {"mobile_phone_detected", "unauthorised_object_detected"}:
+        return "Object Detection"
+    if source_module in {"primary_camera", "secondary_camera"}:
+        return "Visual Intelligence"
+    if source_module == "identity":
+        return "Identity Assurance"
+    return source_module.replace("_", " ").title() or "System"
+
+
+def event_severity(event: dict[str, object]) -> str:
+    risk_weight = float(event.get("risk_weight") or 0)
+    event_type = str(event.get("event_type", ""))
+    if event_type in {"camera_stream_ready", "camera_stream_restored", "face_present"} or risk_weight < 0.2:
+        return "OK"
+    if risk_weight >= 0.7:
+        return "HIGH"
+    return "WATCH"
+
+
+def correlation_summary(events: list[dict[str, object]], alert: dict[str, object] | None) -> dict[str, object]:
+    grouped: dict[str, dict[str, int]] = {}
+    for event in events:
+        group = event_group_name(event)
+        label = event_display_name(event.get("event_type"))
+        grouped.setdefault(group, {})
+        grouped[group][label] = grouped[group].get(label, 0) + 1
+    metrics = resolved_alert_metrics(alert, events)
+    return {
+        "grouped": grouped,
+        "confidence": metrics["confidence"],
+        "risk": metrics["risk_level"],
     }
 
 
@@ -2271,35 +2253,41 @@ def render_event_timeline(events: list[dict[str, object]], limit: int = 8) -> No
     if not visible:
         st.info("No live evidence events have been recorded for this session yet.")
         return
-    rows = []
     for event in visible:
-        rows.append(
-            f"""
-            <div class="cie-event">
-                <time>{event_time_label(event.get("timestamp"))}</time>
-                <strong>{event_display_name(event.get("event_type"))}</strong>
-                <span>{str(event.get("source_module", "")).replace("_", " ")}</span>
-            </div>
-            """
-        )
-    st.markdown(f'<div class="cie-timeline">{"".join(rows)}</div>', unsafe_allow_html=True)
+        severity = event_severity(event)
+        with st.container(border=True):
+            col_time, col_event, col_source, col_confidence = st.columns([1, 3, 2, 1])
+            with col_time:
+                st.caption(severity)
+                st.write(event_time_label(event.get("timestamp")))
+            with col_event:
+                st.write(f"**{event_display_name(event.get('event_type'))}**")
+                st.caption(str(event.get("description") or "Structured evidence event."))
+            with col_source:
+                st.write(str(event.get("source_module", "")).replace("_", " ").title())
+                camera_id = event.get("camera_id")
+                if camera_id:
+                    st.caption(f"Camera: {camera_id}")
+            with col_confidence:
+                confidence = float(event.get("confidence") or 0)
+                st.metric("Confidence", f"{confidence:.0%}")
+        st.divider()
 
 
 def render_correlation_chips(summary: dict[str, object]) -> None:
-    frequency = summary.get("frequency", {})
-    if not isinstance(frequency, dict) or not frequency:
+    grouped = summary.get("grouped", {})
+    if not isinstance(grouped, dict) or not grouped:
         st.info("No correlated event pattern is available yet.")
         return
-    chips = "".join(
-        f'<span class="cie-chip">✓ {label} ×{count}</span>'
-        for label, count in sorted(frequency.items())
-    )
+    for group, frequency in grouped.items():
+        with st.container(border=True):
+            st.write(f"**{group}**")
+            for label, count in sorted(frequency.items()):
+                prefix = "OK" if label in {"Camera Ready", "Camera Restored", "Face Present"} else "WATCH"
+                st.write(f"{prefix} {label} x{count}")
     confidence = float(summary.get("confidence") or 0)
     risk = str(summary.get("risk", "Low")).upper()
-    st.markdown(
-        f"{chips}<br><strong>Confidence:</strong> {confidence:.0%} &nbsp; <strong>Risk:</strong> {risk}",
-        unsafe_allow_html=True,
-    )
+    st.caption(f"Contextual confidence: {confidence:.0%} | Risk: {risk}")
 
 
 def build_demo_event(
@@ -2448,32 +2436,32 @@ def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str)
         events = cached_events(session_id)
         alerts = cached_alerts(session_id)
         latest_alert = alerts[0] if alerts else None
-        modules = ensure_list(latest_alert.get("contributing_modules")) if latest_alert else []
-        confidence = float(latest_alert.get("confidence") or 0) if latest_alert else 0.0
-        current_risk = latest_alert.get("current_risk_score", 0) if latest_alert else 0
-        risk_level = str(latest_alert.get("risk_level", "Low")) if latest_alert else "Low"
-        trend = str(latest_alert.get("risk_trend", "stable")).title() if latest_alert else "Stable"
+        metrics = resolved_alert_metrics(latest_alert, events)
+        confidence = float(metrics["confidence"])
+        current_risk = int(metrics["risk_score"])
+        risk_level = str(metrics["risk_level"])
+        trend = str(metrics["trend"])
         recommendation = reviewer_action_label(latest_alert)
 
-        st.markdown(
-            f"""
-            <div class="cie-stage">
-                <div>Evidence</div>
-                <div>Contextual Reasoning</div>
-                <div>Risk Score</div>
-                <div>Explanation</div>
-                <div>Reviewer Recommendation</div>
-            </div>
-            <div class="cie-grid">
-                <div class="cie-card"><span>Current Session</span><strong>{session_id}</strong></div>
-                <div class="cie-card"><span>Current Risk</span><strong>{current_risk} / {risk_level}</strong></div>
-                <div class="cie-card"><span>Risk Trend</span><strong>{trend}</strong></div>
-                <div class="cie-card"><span>Current Confidence</span><strong>{confidence:.0%}</strong></div>
-                <div class="cie-card"><span>Current Recommendation</span><strong>{recommendation}</strong></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        stage_columns = st.columns(5)
+        for column, label in zip(
+            stage_columns,
+            ["Evidence arrives", "Timeline updates", "CIE reasons", "Risk updates", "Reviewer action"],
+            strict=True,
+        ):
+            column.button(label, disabled=True, use_container_width=True)
+
+        col_session, col_risk, col_trend, col_confidence, col_recommendation = st.columns(5)
+        with col_session:
+            st.metric("Current Session", session_id)
+        with col_risk:
+            st.metric("Current Risk", f"{current_risk} / {risk_level}")
+        with col_trend:
+            st.metric("Risk Trend", trend)
+        with col_confidence:
+            st.metric("Current Confidence", f"{confidence:.0%}")
+        with col_recommendation:
+            st.metric("Current Recommendation", recommendation)
 
         st.write("Live Event Stream")
         render_event_timeline(events)
@@ -2487,19 +2475,11 @@ def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str)
             if latest_alert
             else "No contextual alert has been generated yet. Generate structured events and run CIE analysis to produce reviewer-facing reasoning."
         )
-        st.markdown(f'<div class="cie-explanation">{explanation}</div>', unsafe_allow_html=True)
+        st.info(explanation)
 
         st.write("Reviewer Recommendation")
-        st.markdown(
-            f"""
-            <div class="cie-recommendation">
-                <strong>{recommendation}</strong><br>
-                {recommendation_text(latest_alert)}<br>
-                <em>Human reviewer remains responsible for final decision.</em>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.warning(f"{recommendation}: {recommendation_text(latest_alert)}")
+        st.caption("Human reviewer remains responsible for final decision.")
 
         if has_permission(role, "generate_demo_events"):
             col_window, col_run = st.columns([2, 1])
