@@ -110,9 +110,13 @@ Addenda 3 and 4 elevate the previous Event Fusion Engine into a broader Contextu
 - Contextual/fused alerts store contributing events, contributing modules, current risk score, rolling risk score, risk trend, confidence, explanation, recommended reviewer action, and reasoning trace.
 - Raw evidence events are not overwritten. Fused alerts are separate review objects for human-supervised decision-making.
 - The Monitoring page exposes CIE status, current/rolling risk, trend, contributing modules, explanation preview, and recent contextual/fused alerts.
+- The Monitoring page now presents a viva-ready CIE console showing evidence flow, live event timeline, contextual correlation, explainability, and reviewer recommendation before technical audit tables.
+- A CIE Demo/Test Scenarios panel supports Groups A-J for camera, visual, audio, multimodal fusion, false-positive suppression, explanation, temporal memory, duplicate suppression, report reconciliation, and review-boundary validation.
+- Temporal window sensitivity can be demonstrated using 30-second, 2-minute, and 5-minute windows.
 - Reports expose raw events, contextual/fused alerts, risk timeline, temporal behaviour summary, and contributing-module summaries.
 - The Review page presents CIE-generated alerts as explainable cases with supporting raw events before reviewer accept/reject/escalate decisions.
 - The CIE is independent of Streamlit and can be called from future FastAPI services, background workers, a secure exam player, or unit tests.
+- SERPS detects observable risk indicators. It must not be presented as a raw-video cheating classifier or an automatic misconduct decision system.
 
 ## Monitoring Roadmap
 

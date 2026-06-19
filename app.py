@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -26,6 +27,7 @@ from src.enrolment.face_enrolment import (
     record_face_sample,
 )
 from src.contextual_intelligence.contextual_intelligence_engine import ContextualIntelligenceEngine
+from src.fusion.event_schema import EvidenceEvent
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
 from src.security.access_control import Role, has_permission
@@ -253,6 +255,95 @@ def apply_theme() -> None:
             border-radius: 8px;
             padding: 1rem;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+        .cie-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(120px, 1fr));
+            gap: .75rem;
+            margin: .9rem 0 1rem 0;
+        }
+        .cie-card {
+            background: #ffffff;
+            border: 1px solid #cfe0ea;
+            border-radius: 8px;
+            padding: .85rem;
+            min-height: 96px;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, .04);
+        }
+        .cie-card span {
+            display: block;
+            color: #557086;
+            font-size: .78rem;
+            margin-bottom: .35rem;
+        }
+        .cie-card strong {
+            display: block;
+            color: #0f172a;
+            font-size: 1.35rem;
+            line-height: 1.2;
+        }
+        .cie-stage {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(120px, 1fr));
+            gap: .5rem;
+            margin: .75rem 0 1rem 0;
+        }
+        .cie-stage div {
+            background: #e8f7f5;
+            color: #064e5f;
+            border: 1px solid #b9e4de;
+            border-radius: 8px;
+            padding: .65rem;
+            text-align: center;
+            font-weight: 700;
+            font-size: .86rem;
+        }
+        .cie-timeline {
+            border-left: 3px solid #0a7f78;
+            padding-left: .75rem;
+            margin: .4rem 0 1rem 0;
+        }
+        .cie-event {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            background: #ffffff;
+            border: 1px solid #d7e2eb;
+            border-radius: 8px;
+            padding: .55rem .7rem;
+            margin-bottom: .4rem;
+        }
+        .cie-event time {
+            color: #557086;
+            font-size: .78rem;
+            min-width: 56px;
+        }
+        .cie-chip {
+            display: inline-block;
+            background: #e8f7f5;
+            border: 1px solid #b9e4de;
+            border-radius: 999px;
+            color: #075a75;
+            padding: .35rem .6rem;
+            margin: .15rem .25rem .15rem 0;
+            font-weight: 700;
+            font-size: .86rem;
+        }
+        .cie-explanation {
+            background: #eef7ff;
+            border: 1px solid #b9d9ee;
+            border-radius: 8px;
+            padding: .9rem 1rem;
+            color: #064e7a;
+            margin: .5rem 0;
+        }
+        .cie-recommendation {
+            background: #fff8dc;
+            border-left: 5px solid #f5b400;
+            border-radius: 8px;
+            padding: .9rem 1rem;
+            color: #704b00;
+            margin: .5rem 0;
         }
         .module-grid {
             display: grid;
@@ -2096,49 +2187,313 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
             st.info("No visual intelligence events have been recorded for this session yet.")
 
 
+EVENT_DISPLAY_NAMES = {
+    "camera_stream_ready": "Camera Ready",
+    "camera_stream_missing": "Camera Missing",
+    "camera_stream_disconnected": "Camera Disconnected",
+    "camera_stream_restored": "Camera Restored",
+    "face_present": "Face Present",
+    "face_absent": "Face Absent",
+    "looking_away": "Looking Away",
+    "repeated_looking_away": "Looking Away",
+    "background_speech": "Background Speech",
+    "mobile_phone_detected": "Mobile Phone Detected",
+    "multiple_persons_detected": "Multiple Persons Detected",
+    "unauthorised_object_detected": "Unauthorised Object Detected",
+}
+
+
+def event_display_name(event_type: object) -> str:
+    raw = str(event_type)
+    return EVENT_DISPLAY_NAMES.get(raw, raw.replace("_", " ").title())
+
+
+def event_time_label(timestamp: object) -> str:
+    try:
+        return datetime.fromisoformat(str(timestamp)).strftime("%H:%M:%S")
+    except ValueError:
+        return str(timestamp)[:8]
+
+
+def reviewer_action_label(alert: dict[str, object] | None) -> str:
+    if not alert:
+        return "Observe"
+    risk_level = str(alert.get("risk_level", "Low"))
+    if risk_level == "Critical":
+        return "Escalate"
+    if risk_level == "High":
+        return "Warn / Escalate"
+    if risk_level == "Medium":
+        return "Observe / Warn"
+    return "Ignore / No Action"
+
+
+def recommendation_text(alert: dict[str, object] | None) -> str:
+    if not alert:
+        return "Observe the session and wait for structured evidence before taking action."
+    return str(alert.get("recommended_action") or "Observe and continue monitoring. Human reviewer remains final decision-maker.")
+
+
+def latest_alert_for_session(session_id: str) -> dict[str, object] | None:
+    alerts = cached_alerts(session_id)
+    return alerts[0] if alerts else None
+
+
+def correlation_summary(events: list[dict[str, object]], alert: dict[str, object] | None) -> dict[str, object]:
+    frequency: dict[str, int] = {}
+    for event in events:
+        label = event_display_name(event.get("event_type"))
+        frequency[label] = frequency.get(label, 0) + 1
+    return {
+        "frequency": frequency,
+        "confidence": alert.get("confidence", 0) if alert else 0,
+        "risk": alert.get("risk_level", "Low") if alert else "Low",
+    }
+
+
+def render_event_timeline(events: list[dict[str, object]], limit: int = 8) -> None:
+    visible = list(reversed(events[:limit]))
+    if not visible:
+        st.info("No live evidence events have been recorded for this session yet.")
+        return
+    rows = []
+    for event in visible:
+        rows.append(
+            f"""
+            <div class="cie-event">
+                <time>{event_time_label(event.get("timestamp"))}</time>
+                <strong>{event_display_name(event.get("event_type"))}</strong>
+                <span>{str(event.get("source_module", "")).replace("_", " ")}</span>
+            </div>
+            """
+        )
+    st.markdown(f'<div class="cie-timeline">{"".join(rows)}</div>', unsafe_allow_html=True)
+
+
+def render_correlation_chips(summary: dict[str, object]) -> None:
+    frequency = summary.get("frequency", {})
+    if not isinstance(frequency, dict) or not frequency:
+        st.info("No correlated event pattern is available yet.")
+        return
+    chips = "".join(
+        f'<span class="cie-chip">✓ {label} ×{count}</span>'
+        for label, count in sorted(frequency.items())
+    )
+    confidence = float(summary.get("confidence") or 0)
+    risk = str(summary.get("risk", "Low")).upper()
+    st.markdown(
+        f"{chips}<br><strong>Confidence:</strong> {confidence:.0%} &nbsp; <strong>Risk:</strong> {risk}",
+        unsafe_allow_html=True,
+    )
+
+
+def build_demo_event(
+    session_id: str,
+    candidate_id: str,
+    source_module: str,
+    event_type: str,
+    risk_weight: float,
+    confidence: float,
+    description: str,
+    camera_id: str | None = None,
+    offset_seconds: int = 0,
+) -> EvidenceEvent:
+    timestamp = (datetime.now().astimezone() + timedelta(seconds=offset_seconds)).replace(microsecond=0).isoformat()
+    return EvidenceEvent(
+        session_id=session_id,
+        candidate_id=candidate_id,
+        source_module=source_module,
+        event_type=event_type,
+        risk_weight=risk_weight,
+        confidence=confidence,
+        camera_id=camera_id,
+        description=description,
+        timestamp=timestamp,
+    )
+
+
+def scenario_events(group: str, session_id: str, candidate_id: str) -> list[EvidenceEvent]:
+    if group == "A":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "camera_stream_ready", 0.02, 0.95, "Primary camera ready.", "primary", -12),
+            build_demo_event(session_id, candidate_id, "primary_camera", "camera_stream_missing", 0.5, 0.9, "Primary camera missing.", "primary", -8),
+            build_demo_event(session_id, candidate_id, "primary_camera", "camera_stream_disconnected", 0.65, 0.9, "Primary camera disconnected.", "primary", -4),
+            build_demo_event(session_id, candidate_id, "primary_camera", "camera_stream_restored", 0.15, 0.9, "Primary camera restored.", "primary", -1),
+        ]
+    if group == "B":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "face_present", 0.02, 0.92, "Face present.", "primary", -14),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.76, "Single looking-away event.", "primary", -10),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.78, "Repeated looking away.", "primary", -7),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.79, "Repeated looking away.", "primary", -5),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.81, "Repeated looking away.", "primary", -3),
+            build_demo_event(session_id, candidate_id, "primary_camera", "face_absent", 0.65, 0.82, "Repeated face absence.", "primary", -2),
+            build_demo_event(session_id, candidate_id, "primary_camera", "face_absent", 0.65, 0.84, "Repeated face absence.", "primary", -1),
+        ]
+    if group == "C":
+        return [
+            build_demo_event(session_id, candidate_id, "audio", "background_speech", 0.55, 0.78, "Background speech only.", None, -10),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.76, "Looking away while speech is detected.", "primary", -6),
+            build_demo_event(session_id, candidate_id, "secondary_camera", "mobile_phone_detected", 0.75, 0.88, "Mobile phone detected.", "secondary", -3),
+            build_demo_event(session_id, candidate_id, "secondary_camera", "multiple_persons_detected", 0.8, 0.86, "Multiple persons detected.", "secondary", -1),
+        ]
+    if group == "D":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "camera_stream_disconnected", 0.65, 0.9, "Camera disconnected.", "primary", -7),
+            build_demo_event(session_id, candidate_id, "audio", "background_speech", 0.55, 0.78, "Background speech detected.", None, -4),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.76, "Candidate looking away.", "primary", -1),
+        ]
+    if group == "E":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "face_absent", 0.65, 0.82, "Isolated face absence.", "primary", -20),
+            build_demo_event(session_id, candidate_id, "secondary_camera", "mobile_phone_detected", 0.75, 0.88, "Isolated phone detection.", "secondary", -16),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.76, "Isolated looking away.", "primary", -12),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.78, "Repeated gaze deviation.", "primary", -7),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.8, "Repeated gaze deviation.", "primary", -5),
+            build_demo_event(session_id, candidate_id, "audio", "background_speech", 0.55, 0.78, "Background speech detected.", None, -3),
+        ]
+    if group == "F":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.82, "Repeated looking away.", "primary", -6),
+            build_demo_event(session_id, candidate_id, "audio", "background_speech", 0.55, 0.81, "Background speech detected.", None, -4),
+            build_demo_event(session_id, candidate_id, "secondary_camera", "mobile_phone_detected", 0.75, 0.88, "Mobile phone detected.", "secondary", -2),
+        ]
+    if group == "G":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.76, "Looking away outside short window.", "primary", -180),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.77, "Looking away outside short window.", "primary", -150),
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.78, "Looking away inside current window.", "primary", -5),
+        ]
+    if group == "H":
+        return [
+            build_demo_event(session_id, candidate_id, "secondary_camera", "mobile_phone_detected", 0.75, 0.88, f"Rapid duplicate phone event {index + 1}.", "secondary", -10 + index)
+            for index in range(10)
+        ]
+    if group == "I":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.78, "Report validation looking-away event.", "primary", -5),
+            build_demo_event(session_id, candidate_id, "audio", "background_speech", 0.55, 0.8, "Report validation background speech.", None, -2),
+        ]
+    if group == "J":
+        return [
+            build_demo_event(session_id, candidate_id, "primary_camera", "looking_away", 0.35, 0.78, "Review validation looking-away event.", "primary", -4),
+            build_demo_event(session_id, candidate_id, "audio", "background_speech", 0.55, 0.8, "Review validation background speech.", None, -1),
+        ]
+    return []
+
+
+SCENARIO_LABELS = {
+    "A": "Group A - Camera Events",
+    "B": "Group B - Visual Events",
+    "C": "Group C - Audio Events",
+    "D": "Group D - Multimodal Fusion",
+    "E": "Group E - False Positive Suppression",
+    "F": "Group F - Explanation Completeness",
+    "G": "Group G - Temporal Behaviour Memory",
+    "H": "Group H - Duplicate Suppression",
+    "I": "Group I - Reports Reconciliation",
+    "J": "Group J - Review Boundary",
+}
+
+
+SCENARIO_EXPECTATIONS = {
+    "A": "Ready is low; missing/disconnected increase risk; restored should stabilise confidence.",
+    "B": "Face present is low/no risk; repeated looking-away or face absence raises temporal risk.",
+    "C": "Speech alone is lower risk; speech with visual/object evidence escalates.",
+    "D": "CIE should produce one contextual case rather than treating each modality as an isolated major decision.",
+    "E": "Isolated events should not become critical alone; repeated gaze plus speech should escalate.",
+    "F": "Explanation should include events, modules, confidence, risk score, temporal window, and reviewer action.",
+    "G": "Changing 30s, 2min, and 5min windows should affect correlation strength.",
+    "H": "Rapid duplicates should not unfairly inflate risk because fusion suppresses duplicate signatures.",
+    "I": "Raw Events, Contextual/Fused Alerts, Risk Timeline, Review, and Reports should reconcile.",
+    "J": "Review must never state a final misconduct finding; reviewers receive evidence, explanation, confidence, risk, and recommendation.",
+}
+
+
+def generate_scenario_events(group: str, session_id: str, candidate_id: str, role: str, window_seconds: int) -> FusedAlert | None:
+    generated = scenario_events(group, session_id, candidate_id)
+    for event in generated:
+        save_event(event)
+        log_audit(role, "cie_scenario_event_generated", event.event_id, f"group={group}; {event.event_type}")
+    alert = st.session_state.contextual_intelligence_engine.fuse_recent(session_id, window_seconds)
+    if alert:
+        save_alert(alert)
+        log_audit(role, "cie_scenario_alert_generated", alert.alert_id, f"group={group}; risk={alert.risk_score}")
+    clear_app_caches()
+    return alert
+
+
 def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> None:
     with st.container(border=True):
         st.markdown("#### Contextual Intelligence Engine")
         st.caption(
-            "CIE is the central SERPS reasoning layer. Its Event Fusion Module correlates stored evidence events, "
-            "Temporal Behaviour Memory distinguishes isolated events from persistent patterns, and explainability prepares reviewer-facing reasoning."
+            "Viva-ready reasoning flow: evidence -> contextual reasoning -> risk score -> explanation -> reviewer recommendation. "
+            "CIE recommends human action; it does not make final misconduct decisions."
         )
         events = cached_events(session_id)
         alerts = cached_alerts(session_id)
         latest_alert = alerts[0] if alerts else None
+        modules = ensure_list(latest_alert.get("contributing_modules")) if latest_alert else []
+        confidence = float(latest_alert.get("confidence") or 0) if latest_alert else 0.0
+        current_risk = latest_alert.get("current_risk_score", 0) if latest_alert else 0
+        risk_level = str(latest_alert.get("risk_level", "Low")) if latest_alert else "Low"
+        trend = str(latest_alert.get("risk_trend", "stable")).title() if latest_alert else "Stable"
+        recommendation = reviewer_action_label(latest_alert)
 
-        col_status, col_current, col_trend, col_modules = st.columns(4)
-        with col_status:
-            st.metric("CIE status", "Ready" if events else "Waiting for evidence")
-            st.caption(f"{len(events)} raw event(s) available")
-        with col_current:
-            st.metric("Current risk score", latest_alert.get("current_risk_score", 0) if latest_alert else 0)
-            if latest_alert:
-                st.caption(f"Rolling: {latest_alert.get('rolling_risk_score', latest_alert.get('risk_score', 0))}")
-        with col_trend:
-            st.metric("Risk trend", str(latest_alert.get("risk_trend", "stable")).title() if latest_alert else "Stable")
-            if latest_alert:
-                st.caption(f"Level: {latest_alert.get('risk_level')}")
-        with col_modules:
-            modules = ensure_list(latest_alert.get("contributing_modules")) if latest_alert else []
-            st.metric("Contributing modules", len(modules))
-            if modules:
-                st.caption(", ".join(modules))
+        st.markdown(
+            f"""
+            <div class="cie-stage">
+                <div>Evidence</div>
+                <div>Contextual Reasoning</div>
+                <div>Risk Score</div>
+                <div>Explanation</div>
+                <div>Reviewer Recommendation</div>
+            </div>
+            <div class="cie-grid">
+                <div class="cie-card"><span>Current Session</span><strong>{session_id}</strong></div>
+                <div class="cie-card"><span>Current Risk</span><strong>{current_risk} / {risk_level}</strong></div>
+                <div class="cie-card"><span>Risk Trend</span><strong>{trend}</strong></div>
+                <div class="cie-card"><span>Current Confidence</span><strong>{confidence:.0%}</strong></div>
+                <div class="cie-card"><span>Current Recommendation</span><strong>{recommendation}</strong></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        if latest_alert:
-            st.write("CIE explanation preview")
-            st.info(str(latest_alert.get("explanation", "")))
-        else:
-            st.info("Generate visual, audio, identity, or camera events, then run CIE analysis for the selected temporal window.")
+        st.write("Live Event Stream")
+        render_event_timeline(events)
+
+        st.write("Contextual Correlation")
+        render_correlation_chips(correlation_summary(events, latest_alert))
+
+        st.write("Explainability")
+        explanation = str(
+            latest_alert.get("explanation")
+            if latest_alert
+            else "No contextual alert has been generated yet. Generate structured events and run CIE analysis to produce reviewer-facing reasoning."
+        )
+        st.markdown(f'<div class="cie-explanation">{explanation}</div>', unsafe_allow_html=True)
+
+        st.write("Reviewer Recommendation")
+        st.markdown(
+            f"""
+            <div class="cie-recommendation">
+                <strong>{recommendation}</strong><br>
+                {recommendation_text(latest_alert)}<br>
+                <em>Human reviewer remains responsible for final decision.</em>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         if has_permission(role, "generate_demo_events"):
             col_window, col_run = st.columns([2, 1])
             with col_window:
                 window_seconds = st.selectbox(
                     "CIE temporal window",
-                    [5, 10, 30],
-                    index=2,
-                    format_func=lambda value: f"Last {value} seconds",
+                    [30, 120, 300],
+                    index=0,
+                    format_func=lambda value: "Last 30 seconds" if value == 30 else ("Last 2 minutes" if value == 120 else "Last 5 minutes"),
                     key=f"cie_window_{session_id}",
                 )
             with col_run:
@@ -2158,28 +2513,75 @@ def contextual_intelligence_panel(role: str, session_id: str, candidate_id: str)
                         st.rerun()
                     else:
                         st.info("No actionable contextual alert was generated for the selected temporal window.")
+
+            with st.expander("CIE Demo/Test Scenarios A-J", expanded=True):
+                st.caption("These controls generate structured prototype events for validation. They do not open cameras and do not make final decisions.")
+                scenario_label = st.selectbox(
+                    "Scenario group",
+                    list(SCENARIO_LABELS.values()),
+                    key=f"cie_scenario_{session_id}",
+                )
+                scenario_group = next(key for key, label in SCENARIO_LABELS.items() if label == scenario_label)
+                st.info(SCENARIO_EXPECTATIONS[scenario_group])
+                col_generate, col_sensitivity = st.columns(2)
+                with col_generate:
+                    if st.button("Generate scenario and run CIE", key=f"generate_cie_scenario_{session_id}"):
+                        alert = generate_scenario_events(scenario_group, session_id, candidate_id, role, int(window_seconds))
+                        if alert:
+                            st.success(f"Scenario {scenario_group} generated alert {alert.alert_id}: {alert.risk_level} Risk, score {alert.risk_score}.")
+                        else:
+                            st.info(f"Scenario {scenario_group} generated raw events but no contextual alert in the selected window.")
+                        st.rerun()
+                with col_sensitivity:
+                    if st.button("Run temporal sensitivity test", key=f"cie_temporal_sensitivity_{session_id}"):
+                        for event in scenario_events("G", session_id, candidate_id):
+                            save_event(event)
+                        results = []
+                        for test_window in [30, 120, 300]:
+                            alert = st.session_state.contextual_intelligence_engine.fuse_recent(session_id, test_window)
+                            results.append(
+                                {
+                                    "window": f"{test_window}s",
+                                    "risk_score": alert.risk_score if alert else 0,
+                                    "risk_level": alert.risk_level if alert else "Low",
+                                    "trend": alert.risk_trend if alert else "stable",
+                                }
+                            )
+                        clear_app_caches()
+                        st.session_state[f"cie_temporal_results_{session_id}"] = results
+                        st.rerun()
+                temporal_results = st.session_state.get(f"cie_temporal_results_{session_id}")
+                if temporal_results:
+                    st.write("Temporal window sensitivity results")
+                    st.dataframe(pd.DataFrame(temporal_results), use_container_width=True, hide_index=True)
         else:
             st.info("Your role can inspect CIE alerts but cannot trigger prototype contextual analysis.")
 
-        st.write("Recent contextual/fused alerts")
-        if alerts:
-            alert_frame = pd.DataFrame(alerts)
-            preferred_columns = [
-                "alert_id",
-                "start_time",
-                "risk_level",
-                "current_risk_score",
-                "rolling_risk_score",
-                "risk_trend",
-                "confidence",
-                "alert_type",
-                "contributing_modules",
-                "review_status",
-            ]
-            display_columns = [column for column in preferred_columns if column in alert_frame.columns]
-            st.dataframe(alert_frame[display_columns], use_container_width=True, hide_index=True)
-        else:
-            st.info("No contextual/fused alerts have been generated for this session yet.")
+        with st.expander("Technical details: contextual/fused alerts table", expanded=False):
+            if alerts:
+                alert_frame = pd.DataFrame(alerts)
+                preferred_columns = [
+                    "alert_id",
+                    "start_time",
+                    "risk_level",
+                    "current_risk_score",
+                    "rolling_risk_score",
+                    "risk_trend",
+                    "confidence",
+                    "alert_type",
+                    "contributing_modules",
+                    "review_status",
+                ]
+                display_columns = [column for column in preferred_columns if column in alert_frame.columns]
+                st.dataframe(alert_frame[display_columns], use_container_width=True, hide_index=True)
+            else:
+                st.info("No contextual/fused alerts have been generated for this session yet.")
+
+        with st.expander("Technical details: raw evidence events table", expanded=False):
+            if events:
+                st.dataframe(pd.DataFrame(events), use_container_width=True, hide_index=True)
+            else:
+                st.info("No raw evidence events have been recorded for this session yet.")
 
 
 def store_visual_evidence(session_id: str, candidate_id: str, event_type: str, image_bytes: bytes) -> Path:
@@ -2198,6 +2600,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     if not session_id:
         st.info("Start or select a session to generate monitoring events.")
         return
+    contextual_intelligence_panel(role, session_id, candidate_id)
     camera_stream_foundation_panel(role, session_id, candidate_id)
     visual_intelligence_panel(role, session_id, candidate_id)
 
@@ -2214,12 +2617,12 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     else:
         st.info("Your role cannot generate demo monitoring events.")
 
-    contextual_intelligence_panel(role, session_id, candidate_id)
-
     events = cached_events(session_id)
-    if events:
-        st.write("Raw evidence events")
-        st.dataframe(pd.DataFrame(events), use_container_width=True)
+    with st.expander("Technical audit table: all raw evidence events", expanded=False):
+        if events:
+            st.dataframe(pd.DataFrame(events), use_container_width=True)
+        else:
+            st.info("No raw evidence events have been recorded for this session yet.")
     return_to_top()
 
 

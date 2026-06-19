@@ -89,6 +89,15 @@
 - Updated Review and Reports wording to use CIE-generated contextual/fused alerts, risk timeline, and temporal behaviour summaries.
 - Updated architecture documentation to show the revised pipeline: Sensors, Detection Modules, Structured Event Generation, CIE, Agentic Decision Support, Human Reviewer, Final Decision.
 
+## CIE Monitoring Console and Scenario Validation
+
+- Refined the Monitoring page so the CIE section presents a viva-ready reasoning flow: evidence, contextual reasoning, risk score, explanation, and reviewer recommendation.
+- Added top-level CIE cards for current session, current risk, risk trend, confidence, and reviewer recommendation.
+- Added a live evidence timeline, contextual correlation chips, reviewer-friendly explanation panel, and recommendation panel while keeping raw events and contextual/fused alert tables as expandable technical details.
+- Added CIE Demo/Test Scenarios A-J for camera events, visual events, audio events, multimodal fusion, false-positive suppression, explanation completeness, temporal memory, duplicate suppression, report reconciliation, and review-boundary validation.
+- Added temporal window sensitivity support for 30-second, 2-minute, and 5-minute windows.
+- Expanded unit tests for isolated-event suppression, repeated-event escalation, multimodal escalation, duplicate suppression, temporal-window sensitivity, explanation completeness, reviewer recommendation, and raw-event immutability.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.
