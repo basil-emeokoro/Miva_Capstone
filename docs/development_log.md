@@ -116,6 +116,13 @@
 - Made reviewer recommendation labels dynamic from risk level: Low = Observe, Medium = Warn, High = Escalate, Critical = Immediate Human Review.
 - Reworked contextual correlation into grouped evidence sections for camera health, visual intelligence, audio intelligence, object detection, identity, and system evidence while preserving technical tables in expanders.
 
+## Windows Runtime Compatibility
+
+- Investigated repeated `ConnectionResetError: [WinError 10054]` tracebacks during local Streamlit execution on Windows/Python 3.13.
+- Confirmed the dashboard does not import or start the FastAPI structured-event service during Streamlit startup; the `Uvicorn server started` message comes from the Streamlit runtime.
+- Added a Windows-only asyncio compatibility guard that suppresses only the benign `_ProactorBasePipeTransport._call_connection_lost` `WinError 10054` disconnect traceback. Other connection errors continue to propagate normally.
+- Documented the issue as a harmless browser/client disconnect or shutdown warning when it occurs during Streamlit/Uvicorn transport cleanup.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.

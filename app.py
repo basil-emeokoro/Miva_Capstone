@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 
+from src.runtime.windows_asyncio import install_windows_connection_reset_guard
 from src.audio.audio_event_detector import AUDIO_EVENT_DEFINITIONS, create_audio_event
 from src.camera.camera_stream import (
     camera_status_event,
@@ -60,6 +61,8 @@ from src.vision.visual_event_detector import (
     is_visual_event,
 )
 
+
+install_windows_connection_reset_guard()
 
 APP_ROOT = Path(__file__).resolve().parent
 SERPS_LOGO_PATH = APP_ROOT / "assets" / "SERPS_Logo.png"
