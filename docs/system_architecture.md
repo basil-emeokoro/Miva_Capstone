@@ -38,6 +38,17 @@ Detection modules are perception modules only. They generate immutable structure
 
 Streamlit is the dashboard/control surface. Continuous AI inference should run through service boundaries such as FastAPI, OpenCV workers, WebRTC/browser streams, or a secure exam-player integration. The first live-integration milestone introduces this boundary through `src/services/event_api.py`.
 
+## AI Capability Integration Boundary
+
+The first AI capability sprint strengthens the perception layer without changing the reference architecture.
+
+- Visual analysis can process an explicitly supplied frame through OpenCV face/camera checks, coarse head-pose signalling, and optional YOLO object mapping.
+- Object detection is adapter-based so newer YOLO models can replace the current optional local model with minimal code changes.
+- Audio analysis accepts detector feature windows from future Whisper, WebRTC VAD, Silero VAD, or equivalent workers.
+- Identity assurance converts periodic face-verification confidence into evidence events for CIE ingestion.
+- FastAPI exposes structured endpoints for frame, audio-feature, identity-confidence, and generic event ingestion.
+- Streamlit exposes Live AI controls for user-triggered frame/feature analysis and preserves Demonstration/Simulation controls for viva reliability.
+
 ## Monitoring Modes
 
 - Mode A: single-camera CBT centre mode.

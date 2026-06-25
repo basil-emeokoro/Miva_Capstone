@@ -114,9 +114,13 @@ pip install ultralytics mediapipe
 - Visual detectors remain perception-only and emit `EvidenceEvent` objects for CIE ingestion.
 - OpenCV provides the current local face/camera obstruction analysis.
 - MediaPipe and YOLO are treated as optional live-AI adapters. They are not loaded on page startup and must be invoked behind user-triggered controls or service workers.
-- Audio intelligence now defines structured events for background speech, prolonged speech, abnormal silence, environmental noise, and suspicious audio patterns. Whisper, WebRTC VAD, Silero VAD, or equivalent detectors can be substituted later without changing the CIE contract.
+- Optional YOLO evidence mapping now supports mobile phone, laptop/tablet, book/document, headphones/earpiece, and suspicious handheld-object signals. Newer YOLO models can be substituted through the object-detection configuration without changing the event schema.
+- Audio intelligence now defines structured events for voice activity, background speech, prolonged speech, abnormal silence, environmental noise, and suspicious audio patterns. Whisper, WebRTC VAD, Silero VAD, or equivalent detectors can be substituted later without changing the CIE contract.
+- Identity assurance now emits structured evidence for periodic verification, low confidence, face mismatch, unknown face, and candidate substitution signals. These are evidence inputs only and do not bypass CIE reasoning.
 - `src/services/event_api.py` introduces a FastAPI structured-event API boundary so future camera/audio workers, secure exam players, or edge services can submit events without coupling inference to Streamlit.
+- The API includes service-ready endpoints for frame analysis, audio feature-window analysis, identity-confidence analysis, and generic structured-event ingestion.
 - Streamlit remains an operations dashboard and demo control surface. It is not the monitoring engine.
+- Monitoring supports both Live AI mode and Demonstration/Simulation mode. Live AI mode is currently user-triggered through still-frame upload and audio feature windows; continuous camera/audio monitoring remains a backend service responsibility.
 
 ## Contextual Intelligence Engine
 

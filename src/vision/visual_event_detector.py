@@ -109,6 +109,42 @@ VISUAL_EVENT_DEFINITIONS: dict[str, VisualEventDefinition] = {
         "secondary",
         "Unauthorised object detected in the monitoring area.",
     ),
+    "laptop_or_tablet_detected": VisualEventDefinition(
+        "Laptop or tablet detected",
+        "secondary_camera",
+        "laptop_or_tablet_detected",
+        0.62,
+        0.78,
+        "secondary",
+        "Laptop or tablet detected in the monitoring area.",
+    ),
+    "book_or_document_detected": VisualEventDefinition(
+        "Book or document detected",
+        "secondary_camera",
+        "book_or_document_detected",
+        0.58,
+        0.76,
+        "secondary",
+        "Book or document detected in the monitoring area.",
+    ),
+    "headphones_or_earpiece_detected": VisualEventDefinition(
+        "Headphones or earpiece detected",
+        "secondary_camera",
+        "headphones_or_earpiece_detected",
+        0.64,
+        0.76,
+        "secondary",
+        "Headphones or earpiece detected during monitoring.",
+    ),
+    "suspicious_handheld_object_detected": VisualEventDefinition(
+        "Suspicious handheld object detected",
+        "secondary_camera",
+        "suspicious_handheld_object_detected",
+        0.66,
+        0.76,
+        "secondary",
+        "Suspicious handheld object detected near the candidate.",
+    ),
 }
 
 

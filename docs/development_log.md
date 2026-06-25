@@ -123,6 +123,18 @@
 - Added a Windows-only asyncio compatibility guard that suppresses only the benign `_ProactorBasePipeTransport._call_connection_lost` `WinError 10054` disconnect traceback. Other connection errors continue to propagate normally.
 - Documented the issue as a harmless browser/client disconnect or shutdown warning when it occurs during Streamlit/Uvicorn transport cleanup.
 
+## AI Capability Integration Sprint 1
+
+- Preserved the frozen SERPS architecture and kept the CIE unchanged as the contextual reasoning layer.
+- Strengthened the perception layer so visual, object, audio, and identity components emit only structured `EvidenceEvent` records.
+- Extended coarse head-pose signalling with direction metadata derived from detected face position. This remains a lightweight signal until MediaPipe/WebRTC landmark tracking is introduced.
+- Expanded the optional YOLO adapter to map mobile phones, laptops/tablets, books/documents, headphones/earpieces, and suspicious handheld objects into visual evidence events. YOLO remains lazy-loaded and optional.
+- Added feature-window audio analysis for future Whisper, WebRTC VAD, Silero VAD, or equivalent services. It can emit voice activity, background speech, prolonged speech, abnormal silence, environmental noise, and suspicious audio pattern evidence.
+- Added identity assurance evidence generation for periodic verification, low identity confidence, face mismatch, unknown face, and candidate substitution signals.
+- Extended the FastAPI structured-event boundary with `/vision/analyse-frame`, `/audio/analyse-features`, and `/identity/analyse-confidence` endpoints.
+- Updated Monitoring with explicit Live AI and Demonstration/Simulation modes for visual and audio evidence. Live AI remains user-triggered and does not open cameras or microphones automatically.
+- Detection modules still do not compute misconduct decisions or bypass CIE; reviewers remain the final decision-makers.
+
 ## Load-Time Optimisation Notes
 
 - The app now caches short-lived read-only data for candidates, sessions, events, alerts, audit records, and the SERPS logo.

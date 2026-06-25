@@ -23,6 +23,12 @@ class ObjectDetectionResult:
     available: bool = True
 
 
+@dataclass(frozen=True)
+class ObjectDetectionConfig:
+    model_name: str = "yolov8n.pt"
+    confidence_threshold: float = 0.35
+
+
 OBJECT_DETECTION_HOOKS = {
     "mobile_phone_detected": ObjectDetectionHook(
         "mobile_phone_detected",
@@ -34,11 +40,35 @@ OBJECT_DETECTION_HOOKS = {
         0.82,
         "Prototype hook: unauthorised object detected in the monitoring area.",
     ),
+    "laptop_or_tablet_detected": ObjectDetectionHook(
+        "laptop_or_tablet_detected",
+        0.72,
+        "Prototype hook: laptop or tablet detected in the monitoring area.",
+    ),
+    "book_or_document_detected": ObjectDetectionHook(
+        "book_or_document_detected",
+        0.7,
+        "Prototype hook: book or document detected in the monitoring area.",
+    ),
+    "headphones_or_earpiece_detected": ObjectDetectionHook(
+        "headphones_or_earpiece_detected",
+        0.7,
+        "Prototype hook: headphones or earpiece detected during monitoring.",
+    ),
+    "suspicious_handheld_object_detected": ObjectDetectionHook(
+        "suspicious_handheld_object_detected",
+        0.74,
+        "Prototype hook: suspicious handheld object detected near the candidate.",
+    ),
 }
 
 
 PHONE_LABELS = {"cell phone", "mobile phone", "phone", "smartphone"}
-UNAUTHORISED_LABELS = PHONE_LABELS | {"book", "laptop", "keyboard", "mouse", "tv", "remote"}
+LAPTOP_TABLET_LABELS = {"laptop", "tablet", "ipad", "notebook computer"}
+BOOK_DOCUMENT_LABELS = {"book", "notebook", "paper", "document", "binder"}
+HEADPHONE_LABELS = {"headphones", "earphones", "earpiece", "headset"}
+HANDHELD_OBJECT_LABELS = {"remote", "keyboard", "mouse", "tv", "scissors", "knife"}
+UNAUTHORISED_LABELS = PHONE_LABELS | LAPTOP_TABLET_LABELS | BOOK_DOCUMENT_LABELS | HEADPHONE_LABELS | HANDHELD_OBJECT_LABELS
 
 
 def prototype_object_detection_event(event_type: str) -> ObjectDetectionHook:
@@ -48,14 +78,19 @@ def prototype_object_detection_event(event_type: str) -> ObjectDetectionHook:
         raise ValueError(f"Unsupported object detection hook: {event_type}") from exc
 
 
-def analyse_objects_with_yolo(image_bytes: bytes, confidence_threshold: float = 0.35) -> list[ObjectDetectionResult]:
+def analyse_objects_with_yolo(
+    image_bytes: bytes,
+    confidence_threshold: float = 0.35,
+    config: ObjectDetectionConfig | None = None,
+) -> list[ObjectDetectionResult]:
     """Run optional YOLO object analysis without making any misconduct decision.
 
     The model is loaded lazily only when this function is explicitly called. If
     ultralytics or a local YOLO model is unavailable, the function returns a
     non-event diagnostic result so callers can degrade to prototype hooks.
     """
-    model = _load_yolo_model()
+    config = config or ObjectDetectionConfig(confidence_threshold=confidence_threshold)
+    model = _load_yolo_model(config.model_name)
     if model is None:
         return [
             ObjectDetectionResult(
@@ -86,7 +121,7 @@ def analyse_objects_with_yolo(image_bytes: bytes, confidence_threshold: float = 
             continue
         for box in boxes:
             confidence = float(box.conf[0]) if getattr(box, "conf", None) is not None else 0.0
-            if confidence < confidence_threshold:
+            if confidence < config.confidence_threshold:
                 continue
             class_id = int(box.cls[0]) if getattr(box, "cls", None) is not None else -1
             label = str(names.get(class_id, class_id)).lower()
@@ -96,6 +131,42 @@ def analyse_objects_with_yolo(image_bytes: bytes, confidence_threshold: float = 
                         "mobile_phone_detected",
                         confidence,
                         f"YOLO detected a possible mobile phone ({label}) in the monitoring frame.",
+                        "ultralytics-yolo",
+                    )
+                )
+            elif label in LAPTOP_TABLET_LABELS:
+                detections.append(
+                    ObjectDetectionResult(
+                        "laptop_or_tablet_detected",
+                        confidence,
+                        f"YOLO detected a possible laptop or tablet ({label}) in the monitoring frame.",
+                        "ultralytics-yolo",
+                    )
+                )
+            elif label in BOOK_DOCUMENT_LABELS:
+                detections.append(
+                    ObjectDetectionResult(
+                        "book_or_document_detected",
+                        confidence,
+                        f"YOLO detected a possible book or document ({label}) in the monitoring frame.",
+                        "ultralytics-yolo",
+                    )
+                )
+            elif label in HEADPHONE_LABELS:
+                detections.append(
+                    ObjectDetectionResult(
+                        "headphones_or_earpiece_detected",
+                        confidence,
+                        f"YOLO detected possible headphones or earpiece ({label}) in the monitoring frame.",
+                        "ultralytics-yolo",
+                    )
+                )
+            elif label in HANDHELD_OBJECT_LABELS:
+                detections.append(
+                    ObjectDetectionResult(
+                        "suspicious_handheld_object_detected",
+                        confidence,
+                        f"YOLO detected a suspicious handheld object ({label}) in the monitoring frame.",
                         "ultralytics-yolo",
                     )
                 )
@@ -111,13 +182,13 @@ def analyse_objects_with_yolo(image_bytes: bytes, confidence_threshold: float = 
     return detections
 
 
-@lru_cache(maxsize=1)
-def _load_yolo_model() -> object | None:
+@lru_cache(maxsize=4)
+def _load_yolo_model(model_name: str = "yolov8n.pt") -> object | None:
     try:
         from ultralytics import YOLO
     except Exception:
         return None
     try:
-        return YOLO("yolov8n.pt")
+        return YOLO(model_name)
     except Exception:
         return None

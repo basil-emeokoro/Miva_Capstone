@@ -11,7 +11,13 @@ import streamlit as st
 import numpy as np
 
 from src.runtime.windows_asyncio import install_windows_connection_reset_guard
-from src.audio.audio_event_detector import AUDIO_EVENT_DEFINITIONS, create_audio_event
+from src.audio.audio_event_detector import (
+    AUDIO_EVENT_DEFINITIONS,
+    AudioFeatureSnapshot,
+    analyse_audio_features,
+    create_audio_event,
+    create_audio_event_from_analysis,
+)
 from src.camera.camera_stream import (
     camera_status_event,
     discover_camera_devices,
@@ -2041,33 +2047,46 @@ def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> 
         label_to_type = {definition.label: definition.event_type for definition in VISUAL_EVENT_DEFINITIONS.values()}
 
         if has_permission(role, "generate_demo_events"):
-            st.write("Manual/prototype visual event hooks")
-            col_event, col_camera = st.columns(2)
-            with col_event:
-                selected_label = st.selectbox("Available visual event types", event_labels, key=f"visual_event_select_{session_id}")
-            with col_camera:
-                default_camera = VISUAL_EVENT_DEFINITIONS[label_to_type[selected_label]].camera_id
-                selected_camera = st.selectbox(
-                    "Camera context",
-                    ["primary", "secondary"],
-                    index=0 if default_camera == "primary" else 1,
-                    key=f"visual_camera_context_{session_id}",
-                )
-            if st.button("Generate selected visual evidence event", key=f"generate_visual_event_{session_id}"):
-                event = create_visual_event(session_id, candidate_id, label_to_type[selected_label], camera_id=selected_camera)
-                save_event(event)
-                alert = st.session_state.contextual_intelligence_engine.ingest(event)
-                if alert:
-                    save_alert(alert)
-                log_audit(role, "visual_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
-                clear_app_caches()
-                st.success(f"Saved visual event: {event.event_type}.")
-                st.rerun()
+            visual_mode = st.radio(
+                "Visual evidence mode",
+                ["Live AI frame analysis", "Demonstration / Simulation"],
+                horizontal=True,
+                key=f"visual_evidence_mode_{session_id}",
+            )
+            st.caption(
+                "Live AI mode analyses an explicitly uploaded frame. Simulation mode preserves manual viva controls. "
+                "Neither mode opens a camera on page load."
+            )
 
-            with st.expander("Optional still-image face analysis", expanded=False):
+            if visual_mode == "Demonstration / Simulation":
+                st.write("Manual/prototype visual event hooks")
+                col_event, col_camera = st.columns(2)
+                with col_event:
+                    selected_label = st.selectbox("Available visual event types", event_labels, key=f"visual_event_select_{session_id}")
+                with col_camera:
+                    default_camera = VISUAL_EVENT_DEFINITIONS[label_to_type[selected_label]].camera_id
+                    selected_camera = st.selectbox(
+                        "Camera context",
+                        ["primary", "secondary"],
+                        index=0 if default_camera == "primary" else 1,
+                        key=f"visual_camera_context_{session_id}",
+                    )
+                if st.button("Generate selected visual evidence event", key=f"generate_visual_event_{session_id}"):
+                    event = create_visual_event(session_id, candidate_id, label_to_type[selected_label], camera_id=selected_camera)
+                    save_event(event)
+                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
+                    if alert:
+                        save_alert(alert)
+                    log_audit(role, "visual_event_generated", event.event_id, f"{event.camera_id}:{event.event_type}")
+                    clear_app_caches()
+                    st.success(f"Saved visual event: {event.event_type}.")
+                    st.rerun()
+            else:
+                st.info("Upload a frame from the monitoring context to run OpenCV face analysis, coarse head-pose signalling, and optional YOLO object evidence.")
+
+            with st.expander("Live AI still-image analysis", expanded=visual_mode == "Live AI frame analysis"):
                 st.caption(
-                    "Upload a still image to run local OpenCV face analysis and optional YOLO object hooks without opening the camera. "
-                    "This mirrors the future FastAPI/OpenCV service boundary while keeping Streamlit as a control surface."
+                    "This user-triggered path mirrors the future FastAPI/OpenCV/YOLO service boundary while keeping Streamlit as a dashboard."
                 )
                 upload = st.file_uploader(
                     "Upload visual evidence image",
@@ -2126,7 +2145,16 @@ EVENT_DISPLAY_NAMES = {
     "looking_away": "Looking Away",
     "repeated_looking_away": "Looking Away",
     "background_speech": "Background Speech",
+    "voice_activity_detected": "Voice Activity",
+    "prolonged_speech": "Prolonged Speech",
+    "abnormal_silence": "Abnormal Silence",
+    "environmental_noise": "Environmental Noise",
+    "suspicious_audio_pattern": "Suspicious Audio Pattern",
     "mobile_phone_detected": "Mobile Phone Detected",
+    "laptop_or_tablet_detected": "Laptop or Tablet Detected",
+    "book_or_document_detected": "Book or Document Detected",
+    "headphones_or_earpiece_detected": "Headphones or Earpiece Detected",
+    "suspicious_handheld_object_detected": "Suspicious Handheld Object",
     "multiple_persons_detected": "Multiple Persons Detected",
     "unauthorised_object_detected": "Unauthorised Object Detected",
 }
@@ -2604,22 +2632,68 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
 
     if has_permission(role, "generate_demo_events"):
         st.write("Audio intelligence pipeline")
-        audio_label_to_type = {definition.label: definition.event_type for definition in AUDIO_EVENT_DEFINITIONS.values()}
-        selected_audio_label = st.selectbox(
-            "Audio event type",
-            list(audio_label_to_type),
-            key=f"audio_event_select_{session_id}",
+        audio_mode = st.radio(
+            "Audio evidence mode",
+            ["Live AI feature window", "Demonstration / Simulation"],
+            horizontal=True,
+            key=f"audio_evidence_mode_{session_id}",
         )
-        if st.button("Generate selected audio evidence event"):
-            event = create_audio_event(session_id, candidate_id, audio_label_to_type[selected_audio_label])
-            save_event(event)
-            alert = st.session_state.contextual_intelligence_engine.ingest(event)
-            if alert:
-                save_alert(alert)
-            log_audit(role, "monitoring_audio_event_generated", event.event_id, event.event_type)
-            clear_app_caches()
-            st.success(f"Audio evidence event generated and stored: {event.event_type}.")
-            st.rerun()
+        if audio_mode == "Live AI feature window":
+            st.caption("Enter detector features from a VAD/Whisper/Silero-style worker. The pipeline emits evidence only.")
+            col_duration, col_voice, col_segments = st.columns(3)
+            with col_duration:
+                duration_seconds = st.number_input("Window seconds", min_value=0.0, value=30.0, step=5.0, key=f"audio_duration_{session_id}")
+            with col_voice:
+                voice_ratio = st.slider("Voice activity ratio", 0.0, 1.0, 0.0, 0.05, key=f"audio_voice_ratio_{session_id}")
+            with col_segments:
+                speech_segments = st.number_input("Speech segments", min_value=0, value=0, step=1, key=f"audio_segments_{session_id}")
+            col_silence, col_rms, col_floor = st.columns(3)
+            with col_silence:
+                silence_seconds = st.number_input("Silence seconds", min_value=0.0, value=0.0, step=5.0, key=f"audio_silence_{session_id}")
+            with col_rms:
+                rms_db = st.number_input("RMS dB", value=-30.0, step=1.0, key=f"audio_rms_{session_id}")
+            with col_floor:
+                noise_floor_db = st.number_input("Noise floor dB", value=-45.0, step=1.0, key=f"audio_floor_{session_id}")
+            if st.button("Analyse audio feature window", key=f"analyse_audio_features_{session_id}"):
+                snapshot = AudioFeatureSnapshot(
+                    duration_seconds=duration_seconds,
+                    voice_activity_ratio=voice_ratio,
+                    speech_segments=speech_segments,
+                    silence_seconds=silence_seconds,
+                    rms_db=rms_db,
+                    noise_floor_db=noise_floor_db,
+                    detector_name="dashboard_audio_feature_input",
+                )
+                results = analyse_audio_features(snapshot)
+                if not results:
+                    st.info("No audio evidence event was generated for this feature window.")
+                for result in results:
+                    event = create_audio_event_from_analysis(session_id, candidate_id, result)
+                    save_event(event)
+                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
+                    if alert:
+                        save_alert(alert)
+                    log_audit(role, "monitoring_audio_feature_event", event.event_id, event.event_type)
+                clear_app_caches()
+                st.success(f"Audio feature analysis saved {len(results)} evidence event(s).")
+                st.rerun()
+        else:
+            audio_label_to_type = {definition.label: definition.event_type for definition in AUDIO_EVENT_DEFINITIONS.values()}
+            selected_audio_label = st.selectbox(
+                "Audio event type",
+                list(audio_label_to_type),
+                key=f"audio_event_select_{session_id}",
+            )
+            if st.button("Generate selected audio evidence event"):
+                event = create_audio_event(session_id, candidate_id, audio_label_to_type[selected_audio_label])
+                save_event(event)
+                alert = st.session_state.contextual_intelligence_engine.ingest(event)
+                if alert:
+                    save_alert(alert)
+                log_audit(role, "monitoring_audio_event_generated", event.event_id, event.event_type)
+                clear_app_caches()
+                st.success(f"Audio evidence event generated and stored: {event.event_type}.")
+                st.rerun()
     else:
         st.info("Your role cannot generate demo monitoring events.")
 

@@ -22,6 +22,10 @@ def test_required_visual_events_are_defined() -> None:
         "head_movement_anomaly",
         "mobile_phone_detected",
         "unauthorised_object_detected",
+        "laptop_or_tablet_detected",
+        "book_or_document_detected",
+        "headphones_or_earpiece_detected",
+        "suspicious_handheld_object_detected",
     }
 
     assert required.issubset(VISUAL_EVENT_DEFINITIONS)
