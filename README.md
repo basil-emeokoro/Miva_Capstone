@@ -23,6 +23,7 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
 - Contextual Intelligence Engine with Event Fusion Module, Temporal Behaviour Memory, Risk Scoring Engine, Contextual Reasoning Module, and Explainability Interface
+- Institutional Policy & Incident Management Engine with configurable policy-as-code workflows
 - Reviewer accept/reject/escalate workflow
 - JSON session report export
 - SQLite local storage
@@ -42,8 +43,10 @@ For local demonstration, the same machine may simulate both dashboard staff acti
 5. Monitoring modules generate normal and suspicious demo events.
 6. The Contextual Intelligence Engine produces explainable contextual/fused alerts.
 7. The Agentic AI orchestration foundation prioritises and routes the alerts.
-8. Human reviewer accepts, rejects, or escalates the alert.
-9. A session report is generated.
+8. The Institutional Policy & Incident Management Engine applies institution-specific procedure without deciding guilt.
+9. Candidate acknowledgement and reviewer incident actions are recorded where required.
+10. Human reviewer accepts, rejects, escalates, or closes the incident.
+11. A session report or incident evidence package is generated.
 
 ## Run Locally
 
@@ -140,6 +143,16 @@ Addenda 3 and 4 elevate the previous Event Fusion Engine into a broader Contextu
 - The Review page presents CIE-generated alerts as explainable cases with supporting raw events before reviewer accept/reject/escalate decisions.
 - The CIE is independent of Streamlit and can be called from future FastAPI services, background workers, a secure exam player, or unit tests.
 - SERPS detects observable risk indicators. It must not be presented as a raw-video cheating classifier or an automatic misconduct decision system.
+
+## Institutional Policy and Incident Management
+
+- IPIME sits after Agentic Decision Support and before Human Review in the frozen SERPS pipeline.
+- Policies are configured in `config/institutional_policies.json` rather than hardcoded into the dashboard.
+- IPIME converts CIE risk and agent recommendations into institution-specific procedure such as warning, candidate acknowledgement, reviewer notification, evidence preservation, escalation, or senior review referral.
+- IPIME does not decide misconduct. Candidate-facing wording refers only to a potential examination integrity concern and states that authorised officials review the evidence before any determination.
+- The mock Test Player can pause for a candidate Incident Acknowledgement Form when the selected policy requires it.
+- Reviewers can record incident actions: Observe, Continue Monitoring, Issue Warning, Escalate, Refer to Senior Reviewer, or Close Incident.
+- Reports can export a structured incident evidence package containing candidate/session metadata, contextual risk, contributing evidence, candidate acknowledgement, reviewer action, and audit references.
 
 ## Monitoring Roadmap
 

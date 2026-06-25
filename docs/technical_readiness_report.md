@@ -6,7 +6,7 @@ Baseline implementation commit verified before this report: `0d284a1 ai: integra
 ## Verification Snapshot
 
 - `python -m py_compile app.py`: passed.
-- `python -m pytest -q`: passed, `49 passed`.
+- `python -m pytest -q`: passed, `53 passed` after IPIME foundation tests were added.
 - Streamlit startup smoke test: HTTP `200` on local probe.
 - Startup warnings/tracebacks: no deprecated `use_container_width` warning observed; no Windows `WinError 10054` traceback observed in captured startup log.
 - Camera on page load: no camera activation path is invoked at startup. Camera/image analysis remains user-triggered.
@@ -34,7 +34,7 @@ Baseline implementation commit verified before this report: `0d284a1 ai: integra
 | 17 | Temporal Behaviour Memory | Implemented | Repeated patterns and temporal-window sensitivity are tested and visible through CIE scenarios. | Memory is windowed/rule-based, not long-term behavioural modelling. | `src/contextual_intelligence/temporal_behaviour_memory.py`, tests | Add session-level summaries for final reports. |
 | 18 | Risk Scoring Engine | Implemented | Current/rolling score, risk level, trend, duplicate suppression, and confidence aggregation are in place. | Thresholds are prototype-configured; not institution-calibrated. | `src/contextual_intelligence/risk_scoring_engine.py`, `src/fusion/fusion_engine.py`, tests | Preserve; calibrate thresholds during final demo scenario testing. |
 | 19 | Explainability Interface | Implemented | Alerts include explanations, reasoning trace, contributing events/modules, confidence, and human-review boundary. | Explanations are rule-based, not SHAP/LIME. | `src/contextual_intelligence/explainability_interface.py`, `app.py`, tests | Keep; improve wording for final technical report. |
-| 20 | Agentic Decision Support | Prototype/Simulation | Orchestration foundation recommends workflow actions and is documented in the CIE pipeline. | Full task routing/escalation automation is not yet implemented as a rich module. | `src/orchestration/agentic_orchestrator.py`, docs | Next after live detectors: expand agent actions from CIE output. |
+| 20 | Agentic Decision Support | Prototype/Simulation | Orchestration foundation recommends workflow actions and is documented in the CIE pipeline. | Full task routing/escalation automation is not yet implemented as a rich module. | `src/orchestration/agentic_orchestrator.py`, docs | Continue feeding agent output into IPIME policy workflows. |
 | 21 | Human review workflow | Partially Implemented | Review page exposes CIE-generated alerts, explanation, supporting events, decision status, and reviewer actions. | Workflow is local prototype; no multi-reviewer queue or secure login. | `app.py`, `src/storage/event_repository.py` | Improve reviewer queue and decision audit after agent sprint. |
 | 22 | Reports/export | Partially Implemented | Reports show filters, raw events, contextual alerts, risk timeline, temporal summary, and JSON export. | Formal PDF/Word technical reports and richer charts remain future work. | `app.py`, docs | Add final viva export template and incident summary. |
 | 23 | Privacy/security/audit | Partially Implemented | Consent, camera privacy rule, audit trail, immutable raw events, local-first SQLite, and role simulator warnings are implemented. | No production authentication, encryption-at-rest, RBAC provider, or retention automation. | `app.py`, `src/storage/*`, `README.md` | Document clearly in Chapter 4/5; add minimal retention/privacy notes to final report. |
@@ -54,6 +54,8 @@ Baseline implementation commit verified before this report: `0d284a1 ai: integra
 ## Recommended Next Implementation Sprint
 
 Recommended next sprint: **Live Visual Stream Adapter + MediaPipe Landmark Foundation**.
+
+Post-report governance update: IPIME foundation has been added after this readiness baseline. It introduces configurable institutional policy workflows, candidate acknowledgement, reviewer incident actions, and structured evidence-package export without changing the frozen CIE reasoning layer.
 
 Scope:
 

@@ -34,7 +34,20 @@ from src.enrolment.face_enrolment import (
     record_face_sample,
 )
 from src.contextual_intelligence.contextual_intelligence_engine import ContextualIntelligenceEngine
-from src.fusion.event_schema import EvidenceEvent
+from src.fusion.event_schema import EvidenceEvent, FusedAlert
+from src.orchestration.agentic_orchestrator import AgenticOrchestrator
+from src.policy.incident_repository import (
+    REVIEWER_INCIDENT_ACTIONS,
+    build_evidence_package,
+    get_policy_decision_for_alert,
+    list_candidate_acknowledgements,
+    list_policy_decisions,
+    list_reviewer_incident_decisions,
+    record_candidate_acknowledgement,
+    record_reviewer_incident_decision,
+    save_policy_decision,
+)
+from src.policy.policy_engine import evaluate_institutional_policy
 from src.reporting.session_report import export_session_report_json
 from src.review import record_review
 from src.security.access_control import Role, has_permission
@@ -129,12 +142,18 @@ def cached_audit_logs(limit: int = 30) -> list[dict[str, object]]:
     return list_recent_audit_logs(limit)
 
 
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_policy_decisions(session_id: str | None = None) -> list[dict[str, object]]:
+    return list_policy_decisions(session_id)
+
+
 def clear_app_caches() -> None:
     cached_candidates.clear()
     cached_sessions.clear()
     cached_events.clear()
     cached_alerts.clear()
     cached_audit_logs.clear()
+    cached_policy_decisions.clear()
 
 
 def ensure_list(value: object) -> list[str]:
@@ -1825,6 +1844,13 @@ def inject_auth_overlay() -> None:
 
 def mock_test_player() -> None:
     st.subheader("Prototype Test Player")
+    active_session = get_cached_session(st.session_state.get("active_session_id"))
+    if not active_session:
+        active_session = next((session for session in cached_sessions() if session.get("session_status") == "active"), None)
+    if active_session and render_candidate_incident_acknowledgement_panel(active_session):
+        return_to_top()
+        return
+
     questions = load_sample_questions()
     answers: dict[str, str] = {}
     with st.form("mock_test"):
@@ -1839,6 +1865,65 @@ def mock_test_player() -> None:
         result = grade_answers(answers, questions)
         st.success(f"Score: {result['correct']}/{result['total']} ({result['percentage']}%)")
     return_to_top()
+
+
+def render_candidate_incident_acknowledgement_panel(session: dict[str, object]) -> bool:
+    session_id = str(session["session_id"])
+    candidate_id = str(session["candidate_id"])
+    pending_decisions = [
+        decision
+        for decision in cached_policy_decisions(session_id)
+        if decision.get("require_acknowledgement")
+        and decision.get("status") == "awaiting_candidate_acknowledgement"
+        and not list_candidate_acknowledgements(str(decision["decision_id"]))
+    ]
+    if not pending_decisions:
+        return False
+
+    decision = pending_decisions[0]
+    package = build_evidence_package(str(decision["decision_id"]))
+    alert = package.get("contextual_risk_assessment") or {}
+    st.warning("The mock assessment is paused for an institutional incident acknowledgement workflow.")
+    with st.container(border=True):
+        st.markdown("#### Candidate Incident Acknowledgement")
+        st.info(str(decision.get("candidate_message")))
+        col_summary, col_time = st.columns(2)
+        with col_summary:
+            st.write("Incident summary")
+            st.write(str(alert.get("explanation") or "A contextual monitoring concern was recorded."))
+            st.caption(f"Risk level: {decision.get('risk_level')} | Policy: {decision.get('workflow_label')}")
+        with col_time:
+            st.write("Timestamp")
+            st.write(str(decision.get("created_at")))
+            st.caption(f"Session: {session_id}")
+        evidence = package.get("contributing_evidence") or []
+        if evidence:
+            with st.expander("Selected supporting evidence", expanded=False):
+                st.dataframe(pd.DataFrame(evidence), width="stretch", hide_index=True)
+        with st.form(f"incident_ack_{decision['decision_id']}"):
+            explanation = st.text_area(
+                "Candidate explanation",
+                help="Explain what happened from your perspective. This response is reviewed by an authorised examination official.",
+            )
+            acknowledged = st.checkbox(
+                "I acknowledge that this concern and my explanation will be reviewed by an authorised examination official.",
+            )
+            submitted = st.form_submit_button("Submit acknowledgement")
+        if submitted:
+            if not explanation.strip() or not acknowledged:
+                st.error("Provide an explanation and tick the acknowledgement checkbox before submitting.")
+            else:
+                ack_id = record_candidate_acknowledgement(
+                    str(decision["decision_id"]),
+                    candidate_id,
+                    explanation,
+                    acknowledged,
+                )
+                log_audit("Candidate", "incident_acknowledged", ack_id, f"decision_id={decision['decision_id']}; session_id={session_id}")
+                clear_app_caches()
+                st.success("Acknowledgement recorded. The assessment may continue according to institutional review procedures.")
+                st.rerun()
+    return True
 
 
 def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str) -> None:
@@ -2201,6 +2286,36 @@ def recommendation_text(alert: dict[str, object] | None) -> str:
 def latest_alert_for_session(session_id: str) -> dict[str, object] | None:
     alerts = cached_alerts(session_id)
     return alerts[0] if alerts else None
+
+
+def fused_alert_from_row(alert: dict[str, object]) -> FusedAlert:
+    return FusedAlert(
+        alert_id=str(alert["alert_id"]),
+        session_id=str(alert["session_id"]),
+        candidate_id=str(alert["candidate_id"]),
+        start_time=str(alert["start_time"]),
+        end_time=str(alert["end_time"]),
+        risk_score=int(alert.get("risk_score") or alert.get("current_risk_score") or 0),
+        risk_level=str(alert.get("risk_level") or "Low"),  # type: ignore[arg-type]
+        alert_type=str(alert.get("alert_type") or "monitoring_alert"),
+        contributing_events=ensure_list(alert.get("contributing_events")),
+        explanation=str(alert.get("explanation") or ""),
+        recommended_action=str(alert.get("recommended_action") or reviewer_action_label(alert)),
+        confidence=float(alert.get("confidence") or 0),
+        current_risk_score=int(alert.get("current_risk_score") or alert.get("risk_score") or 0),
+        rolling_risk_score=int(alert.get("rolling_risk_score") or alert.get("risk_score") or 0),
+        risk_trend=str(alert.get("risk_trend") or "stable"),
+        contributing_modules=ensure_list(alert.get("contributing_modules")),
+        reasoning_trace=ensure_list(alert.get("reasoning_trace")),
+        review_status=str(alert.get("review_status") or "pending"),
+    )
+
+
+def institution_profile_for_candidate(candidate_id: str) -> str:
+    candidate = get_candidate(candidate_id)
+    if not candidate:
+        return "Generic"
+    return str(candidate.get("institution_type") or candidate.get("institution") or "Generic")
 
 
 def resolved_alert_metrics(alert: dict[str, object] | None, events: list[dict[str, object]]) -> dict[str, object]:
@@ -2751,6 +2866,8 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
         else:
             st.info("No supporting raw events were found for this alert.")
 
+    render_ipime_review_panel(role, selected_alert)
+
     if has_permission(role, "review_alerts"):
         decision = st.selectbox("Decision", ["accepted", "rejected", "escalated"], key="review_decision_select")
         comment = st.text_area("Reviewer comment")
@@ -2761,6 +2878,99 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
     else:
         st.info("Only Admin or Reviewer roles can submit final alert decisions.")
     return_to_top()
+
+
+def render_ipime_review_panel(role: str, alert: dict[str, object]) -> None:
+    st.markdown("#### Institutional Policy & Incident Management Engine")
+    candidate_id = str(alert["candidate_id"])
+    institution_profile = institution_profile_for_candidate(candidate_id)
+    orchestrated = AgenticOrchestrator().plan_actions(fused_alert_from_row(alert))
+    policy_preview = evaluate_institutional_policy(
+        alert,
+        institution_profile,
+        agent_actions=orchestrated.actions,
+        agent_priority=orchestrated.priority,
+    )
+    existing_decision = get_policy_decision_for_alert(str(alert["alert_id"]))
+
+    with st.container(border=True):
+        col_agent, col_policy, col_ack, col_notify = st.columns(4)
+        with col_agent:
+            st.metric("Agent priority", orchestrated.priority.title())
+            st.caption(", ".join(orchestrated.actions))
+        with col_policy:
+            st.metric("Policy", policy_preview.workflow_label)
+            st.caption(f"Institution profile: {policy_preview.institution_profile}")
+        with col_ack:
+            st.metric("Candidate acknowledgement", "Required" if policy_preview.require_acknowledgement else "Not Required")
+            st.caption("Assessment pause enabled" if policy_preview.pause_assessment else "Assessment continues")
+        with col_notify:
+            st.metric("Notify", policy_preview.notify_role)
+            st.caption("Evidence preserved" if policy_preview.preserve_evidence else "Evidence not retained by policy")
+
+        st.info(policy_preview.candidate_message)
+        st.write("Policy actions")
+        st.dataframe(
+            pd.DataFrame({"action": policy_preview.recommended_actions}),
+            width="stretch",
+            hide_index=True,
+        )
+
+        if existing_decision:
+            st.success(f"IPIME decision already recorded: {existing_decision['decision_id']} ({existing_decision['status']}).")
+            decision_id = str(existing_decision["decision_id"])
+        elif has_permission(role, "review_alerts"):
+            if st.button("Apply institutional policy to this alert", key=f"apply_policy_{alert['alert_id']}"):
+                decision_id = save_policy_decision(policy_preview)
+                log_audit(
+                    role,
+                    "ipime_policy_applied",
+                    decision_id,
+                    f"alert_id={alert['alert_id']}; policy_id={policy_preview.policy_id}; priority={orchestrated.priority}",
+                )
+                clear_app_caches()
+                st.success(f"IPIME policy decision recorded: {decision_id}.")
+                st.rerun()
+            decision_id = ""
+        else:
+            st.caption("Only Admin or Reviewer roles can apply institutional policy decisions.")
+            decision_id = ""
+
+        if existing_decision:
+            render_incident_decision_state(role, decision_id)
+
+
+def render_incident_decision_state(role: str, decision_id: str) -> None:
+    acknowledgements = list_candidate_acknowledgements(decision_id)
+    reviewer_actions = list_reviewer_incident_decisions(decision_id)
+    col_ack, col_review = st.columns(2)
+    with col_ack:
+        st.write("Candidate acknowledgement")
+        if acknowledgements:
+            st.dataframe(pd.DataFrame(acknowledgements), width="stretch", hide_index=True)
+        else:
+            st.caption("No candidate acknowledgement has been submitted yet.")
+    with col_review:
+        st.write("Reviewer incident actions")
+        if reviewer_actions:
+            st.dataframe(pd.DataFrame(reviewer_actions), width="stretch", hide_index=True)
+        else:
+            st.caption("No reviewer incident action has been recorded yet.")
+
+    if has_permission(role, "review_alerts"):
+        with st.form(f"incident_reviewer_action_{decision_id}"):
+            action = st.selectbox("Reviewer incident action", REVIEWER_INCIDENT_ACTIONS)
+            rationale = st.text_area("Reviewer rationale")
+            submitted = st.form_submit_button("Record incident action")
+        if submitted:
+            if not rationale.strip():
+                st.error("Reviewer rationale is required.")
+            else:
+                incident_review_id = record_reviewer_incident_decision(decision_id, role, action, rationale)
+                log_audit(role, "incident_reviewer_action", incident_review_id, f"decision_id={decision_id}; action={action}")
+                clear_app_caches()
+                st.success(f"Incident reviewer action recorded: {incident_review_id}.")
+                st.rerun()
 
 
 def reports_panel(role: str, session_id: str | None) -> None:
@@ -2869,6 +3079,38 @@ def reports_panel(role: str, session_id: str | None) -> None:
         )
     else:
         st.info("No contributing module summary is available for the selected filters.")
+
+    filtered_policy_decisions = cached_policy_decisions(selected_session_id)
+    if selected_candidate_id:
+        filtered_policy_decisions = [
+            decision for decision in filtered_policy_decisions if str(decision.get("candidate_id")) == selected_candidate_id
+        ]
+    if selected_risk != "All risk levels":
+        filtered_policy_decisions = [
+            decision for decision in filtered_policy_decisions if str(decision.get("risk_level")) == selected_risk
+        ]
+    st.write("Institutional Incident Decisions")
+    if filtered_policy_decisions:
+        st.dataframe(pd.DataFrame(filtered_policy_decisions), width="stretch", hide_index=True)
+        package_labels = [
+            f"{decision['decision_id']} - {decision['candidate_id']} - {decision['risk_level']} - {decision['status']}"
+            for decision in filtered_policy_decisions
+        ]
+        selected_package = st.selectbox("Evidence package", package_labels, key="report_evidence_package_select")
+        package_decision_id = selected_package.split(" - ")[0]
+        if has_permission(role, "export_reports"):
+            package = build_evidence_package(package_decision_id)
+            st.download_button(
+                "Download incident evidence package JSON",
+                data=json.dumps(package, indent=2, default=str),
+                file_name=f"{package_decision_id}_evidence_package.json",
+                mime="application/json",
+                width="content",
+            )
+        else:
+            st.caption("Incident evidence-package export is available to Admin and Reviewer roles.")
+    else:
+        st.info("No institutional incident decisions match the selected filters.")
 
     export_session_id = selected_session_id or session_id
     if export_session_id and has_permission(role, "export_reports") and st.button("Export selected session JSON report"):

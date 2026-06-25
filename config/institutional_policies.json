@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "policies": [
+    {
+      "policy_id": "waec_high_risk_incident_acknowledgement",
+      "institution_profiles": ["WAEC"],
+      "min_risk_level": "High",
+      "workflow_label": "WAEC incident acknowledgement workflow",
+      "recommended_actions": [
+        "pause_assessment",
+        "display_candidate_acknowledgement_form",
+        "capture_candidate_explanation",
+        "notify_reviewer",
+        "preserve_evidence"
+      ],
+      "pause_assessment": true,
+      "require_acknowledgement": true,
+      "notify_role": "Reviewer",
+      "preserve_evidence": true,
+      "candidate_message": "A potential examination integrity concern has been detected. Please provide your explanation. Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
+    },
+    {
+      "policy_id": "university_medium_risk_warning_review",
+      "institution_profiles": ["University", "Miva"],
+      "min_risk_level": "Medium",
+      "workflow_label": "University warning and review workflow",
+      "recommended_actions": [
+        "display_warning",
+        "continue_assessment",
+        "flag_for_later_review",
+        "preserve_evidence"
+      ],
+      "pause_assessment": false,
+      "require_acknowledgement": false,
+      "notify_role": "Reviewer",
+      "preserve_evidence": true,
+      "candidate_message": "A potential examination integrity concern has been logged for review. Please continue the assessment and follow all examination instructions."
+    },
+    {
+      "policy_id": "generic_critical_risk_senior_review",
+      "institution_profiles": ["Generic"],
+      "min_risk_level": "Critical",
+      "workflow_label": "Generic critical-risk senior review workflow",
+      "recommended_actions": [
+        "recommend_suspension",
+        "notify_senior_reviewer",
+        "preserve_evidence",
+        "await_human_review"
+      ],
+      "pause_assessment": true,
+      "require_acknowledgement": true,
+      "notify_role": "Senior Reviewer",
+      "preserve_evidence": true,
+      "candidate_message": "A potential examination integrity concern has been detected. Please provide your explanation. Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
+    },
+    {
+      "policy_id": "generic_low_medium_observe",
+      "institution_profiles": ["Generic"],
+      "min_risk_level": "Low",
+      "workflow_label": "Generic observation workflow",
+      "recommended_actions": [
+        "observe",
+        "continue_monitoring",
+        "preserve_evidence"
+      ],
+      "pause_assessment": false,
+      "require_acknowledgement": false,
+      "notify_role": "Reviewer",
+      "preserve_evidence": true,
+      "candidate_message": "A monitoring note has been logged. Continue the assessment and follow all examination instructions."
+    }
+  ]
+}

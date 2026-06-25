@@ -146,6 +146,47 @@ CREATE TABLE IF NOT EXISTS reviewer_decisions (
     FOREIGN KEY(alert_id) REFERENCES fused_alerts(alert_id)
 );
 
+CREATE TABLE IF NOT EXISTS policy_decisions (
+    decision_id TEXT PRIMARY KEY,
+    policy_id TEXT NOT NULL,
+    institution_profile TEXT NOT NULL,
+    alert_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    risk_level TEXT NOT NULL,
+    agent_priority TEXT,
+    agent_actions TEXT NOT NULL,
+    recommended_actions TEXT NOT NULL,
+    pause_assessment INTEGER NOT NULL DEFAULT 0,
+    require_acknowledgement INTEGER NOT NULL DEFAULT 0,
+    notify_role TEXT NOT NULL,
+    preserve_evidence INTEGER NOT NULL DEFAULT 1,
+    candidate_message TEXT NOT NULL,
+    workflow_label TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS incident_acknowledgements (
+    acknowledgement_id TEXT PRIMARY KEY,
+    decision_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    candidate_explanation TEXT NOT NULL,
+    acknowledged INTEGER NOT NULL DEFAULT 0,
+    acknowledged_at TEXT NOT NULL,
+    FOREIGN KEY(decision_id) REFERENCES policy_decisions(decision_id)
+);
+
+CREATE TABLE IF NOT EXISTS reviewer_incident_decisions (
+    incident_review_id TEXT PRIMARY KEY,
+    decision_id TEXT NOT NULL,
+    reviewer_id TEXT NOT NULL,
+    reviewer_action TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    reviewed_at TEXT NOT NULL,
+    FOREIGN KEY(decision_id) REFERENCES policy_decisions(decision_id)
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     audit_id TEXT PRIMARY KEY,
     actor TEXT NOT NULL,
@@ -175,6 +216,7 @@ def initialize_database(path: str | Path | None = None) -> None:
         connection.executescript(SCHEMA)
         _ensure_candidate_columns(connection)
         _ensure_fused_alert_columns(connection)
+        _ensure_policy_decision_columns(connection)
 
 
 def fetch_all(query: str, params: Iterable[object] = ()) -> list[sqlite3.Row]:
@@ -216,3 +258,15 @@ def _ensure_fused_alert_columns(connection: sqlite3.Connection) -> None:
     for column, definition in required_columns.items():
         if column not in existing:
             connection.execute(f"ALTER TABLE fused_alerts ADD COLUMN {column} {definition}")
+
+
+def _ensure_policy_decision_columns(connection: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in connection.execute("PRAGMA table_info(policy_decisions)").fetchall()}
+    required_columns = {
+        "agent_priority": "TEXT",
+        "agent_actions": "TEXT NOT NULL DEFAULT '[]'",
+        "workflow_label": "TEXT NOT NULL DEFAULT 'Institutional incident workflow'",
+    }
+    for column, definition in required_columns.items():
+        if column not in existing:
+            connection.execute(f"ALTER TABLE policy_decisions ADD COLUMN {column} {definition}")

@@ -154,6 +154,17 @@
 8. Human reviewer accepts, rejects, or escalates.
 9. Report is generated for the session.
 
+## Institutional Policy and Incident Management Foundation
+
+- Added the Institutional Policy & Incident Management Engine as a governance layer after Agentic Decision Support and before Human Review, preserving the frozen SERPS architecture.
+- Added policy-as-code configuration in `config/institutional_policies.json` for WAEC, University/Miva, and Generic incident workflows.
+- Added SQLite persistence for policy decisions, candidate incident acknowledgements, and reviewer incident actions.
+- Added a candidate Incident Acknowledgement Form in the mock Test Player for policies that require assessment pause and candidate explanation.
+- Added Review-page IPIME controls showing agent priority, selected institutional workflow, acknowledgement requirement, notification target, and preserved evidence status.
+- Added reviewer incident actions: Observe, Continue Monitoring, Issue Warning, Escalate, Refer to Senior Reviewer, and Close Incident.
+- Added incident evidence-package JSON export in Reports with candidate/session metadata, contextual risk, contributing events, candidate acknowledgement, reviewer action, and audit reference note.
+- Candidate-facing wording avoids misconduct conclusions and preserves due process: the system reports a potential examination integrity concern for authorised human review.
+
 ## Prototype Limitations
 
 - Face recognition, voice verification, camera feeds, and YOLO detection are represented by prototype/demo event flows at this stage.
