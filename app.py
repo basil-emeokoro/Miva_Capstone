@@ -34,6 +34,14 @@ from src.enrolment.face_enrolment import (
     record_face_sample,
 )
 from src.contextual_intelligence.contextual_intelligence_engine import ContextualIntelligenceEngine
+from src.evaluation.viva_scenarios import (
+    execute_viva_scenario,
+    get_viva_scenario_run,
+    list_viva_scenario_runs,
+    list_viva_scenarios,
+    record_viva_candidate_acknowledgement,
+    record_viva_reviewer_decision,
+)
 from src.fusion.event_schema import EvidenceEvent, FusedAlert
 from src.orchestration.agentic_orchestrator import AgenticOrchestrator
 from src.policy.incident_repository import (
@@ -147,6 +155,11 @@ def cached_policy_decisions(session_id: str | None = None) -> list[dict[str, obj
     return list_policy_decisions(session_id)
 
 
+@st.cache_data(ttl=5, show_spinner=False)
+def cached_viva_scenario_runs(session_id: str | None = None) -> list[dict[str, object]]:
+    return list_viva_scenario_runs(session_id)
+
+
 def clear_app_caches() -> None:
     cached_candidates.clear()
     cached_sessions.clear()
@@ -154,6 +167,7 @@ def clear_app_caches() -> None:
     cached_alerts.clear()
     cached_audit_logs.clear()
     cached_policy_decisions.clear()
+    cached_viva_scenario_runs.clear()
 
 
 def ensure_list(value: object) -> list[str]:
@@ -2733,6 +2747,161 @@ def store_visual_evidence(session_id: str, candidate_id: str, event_type: str, i
     return path
 
 
+def viva_scenario_validation_panel(role: str, session_id: str, candidate_id: str) -> None:
+    with st.container(border=True):
+        st.markdown("#### Viva Scenario Validation")
+        st.caption(
+            "Controlled evaluation scenarios exercise the full SERPS governance pipeline: detection -> structured evidence -> "
+            "CIE -> Agentic Decision Support -> IPIME -> candidate acknowledgement -> human review -> final outcome. "
+            "They are validation traces, not production cheating labels."
+        )
+        scenarios = list_viva_scenarios()
+        scenario_labels = [f"{scenario.name} ({scenario.expected_risk_level})" for scenario in scenarios]
+        selected_label = st.selectbox("Scenario", scenario_labels, key=f"viva_scenario_select_{session_id}")
+        selected_index = scenario_labels.index(selected_label)
+        scenario = scenarios[selected_index]
+
+        col_expected, col_policy, col_action = st.columns(3)
+        with col_expected:
+            st.metric("Expected risk", scenario.expected_risk_level)
+        with col_policy:
+            st.metric("Expected policy", scenario.expected_policy_response)
+        with col_action:
+            st.metric("Reviewer action", scenario.reviewer_action)
+        st.info(scenario.description)
+
+        if has_permission(role, "generate_demo_events"):
+            if st.button("Run selected viva scenario", key=f"run_viva_scenario_{session_id}"):
+                result = execute_viva_scenario(scenario.scenario_id, session_id, candidate_id)
+                for event in result.generated_events:
+                    log_audit(role, "viva_scenario_event_generated", event.event_id, f"scenario={scenario.scenario_id}; {event.event_type}")
+                log_audit(
+                    role,
+                    "viva_scenario_validated",
+                    result.run_id,
+                    f"scenario={scenario.scenario_id}; alert={result.alert.alert_id}; policy_decision={result.policy_decision_id}",
+                )
+                st.session_state[f"latest_viva_run_{session_id}"] = result.run_id
+                clear_app_caches()
+                st.success(f"Scenario run recorded: {result.run_id} ({result.pass_status}).")
+                st.rerun()
+        else:
+            st.info("Your role can inspect scenario validation records but cannot generate new scenario evidence.")
+
+        runs = cached_viva_scenario_runs(session_id)
+        if not runs:
+            st.info("No viva scenario validation runs have been recorded for this session yet.")
+            return
+
+        latest_run_id = st.session_state.get(f"latest_viva_run_{session_id}", str(runs[0]["run_id"]))
+        run_labels = [f"{run['run_id']} - {run['scenario_name']} - {run['pass_status']}" for run in runs]
+        default_index = next((index for index, label in enumerate(run_labels) if str(latest_run_id) in label), 0)
+        selected_run_label = st.selectbox("Validation run", run_labels, index=default_index, key=f"viva_run_select_{session_id}")
+        selected_run_id = selected_run_label.split(" - ")[0]
+        run = get_viva_scenario_run(selected_run_id) or runs[default_index]
+
+        st.write("Scenario validation summary")
+        summary_columns = st.columns(5)
+        summary_columns[0].metric("Expected risk", str(run.get("expected_risk_level")))
+        summary_columns[1].metric("Actual risk", str(run.get("actual_risk_level")))
+        summary_columns[2].metric("Expected policy", str(run.get("expected_policy_response")))
+        summary_columns[3].metric("Actual policy", str(run.get("actual_policy_response")))
+        summary_columns[4].metric("Status", str(run.get("pass_status")))
+        st.caption(str(run.get("notes") or "Controlled viva validation scenario."))
+
+        alert = next((item for item in cached_alerts(session_id) if str(item.get("alert_id")) == str(run.get("alert_id"))), None)
+        if alert:
+            col_score, col_confidence, col_agent = st.columns(3)
+            with col_score:
+                st.metric("CIE risk score", alert.get("rolling_risk_score", alert.get("risk_score", 0)))
+            with col_confidence:
+                st.metric("CIE confidence", f"{float(alert.get('confidence', 0)):.0%}")
+            with col_agent:
+                st.metric("Agentic recommendation", str(run.get("agent_recommendation")).title())
+            st.info(str(alert.get("explanation", "No CIE explanation was stored.")))
+            supporting_ids = set(ensure_list(alert.get("contributing_events")))
+            supporting_events = [
+                event for event in cached_events(session_id) if str(event.get("event_id")) in supporting_ids
+            ]
+            with st.expander("Generated raw evidence events", expanded=True):
+                if supporting_events:
+                    st.dataframe(pd.DataFrame(supporting_events), width="stretch", hide_index=True)
+                else:
+                    st.info("No generated evidence rows were found for this scenario run.")
+
+        decision_id = str(run.get("policy_decision_id") or "")
+        if decision_id:
+            decision = next((item for item in cached_policy_decisions(session_id) if str(item.get("decision_id")) == decision_id), None)
+            if decision:
+                st.write("IPIME policy response")
+                col_pause, col_ack, col_notify, col_outcome = st.columns(4)
+                col_pause.metric("Pause assessment", "Yes" if decision.get("pause_assessment") else "No")
+                col_ack.metric("Candidate acknowledgement", "Required" if decision.get("require_acknowledgement") else "Not Required")
+                col_notify.metric("Notify", str(decision.get("notify_role")))
+                col_outcome.metric("Outcome state", str(run.get("final_outcome_status")))
+                st.caption(", ".join(ensure_list(decision.get("recommended_actions"))))
+
+        if run.get("acknowledgement_required") and not run.get("acknowledgement_recorded"):
+            with st.form(f"viva_ack_{selected_run_id}"):
+                explanation = st.text_area(
+                    "Candidate acknowledgement explanation",
+                    value="I understand the concern and request authorised review of the evidence.",
+                )
+                acknowledged = st.checkbox(
+                    "Candidate acknowledges that the concern and response will be reviewed by an authorised official.",
+                    value=True,
+                )
+                submitted = st.form_submit_button("Record candidate acknowledgement")
+            if submitted:
+                if not explanation.strip() or not acknowledged:
+                    st.error("Provide an explanation and acknowledgement before recording this scenario step.")
+                else:
+                    ack_id = record_viva_candidate_acknowledgement(selected_run_id, explanation, acknowledged)
+                    log_audit(role, "viva_candidate_acknowledgement", ack_id, f"scenario_run={selected_run_id}")
+                    clear_app_caches()
+                    st.success(f"Candidate acknowledgement recorded: {ack_id}.")
+                    st.rerun()
+        elif run.get("acknowledgement_required"):
+            st.success("Candidate acknowledgement has been recorded for this scenario run.")
+
+        if has_permission(role, "review_alerts") and not run.get("reviewer_decision_recorded"):
+            with st.form(f"viva_reviewer_{selected_run_id}"):
+                reviewer_action = st.selectbox(
+                    "Reviewer scenario action",
+                    REVIEWER_INCIDENT_ACTIONS,
+                    index=REVIEWER_INCIDENT_ACTIONS.index("Continue Monitoring")
+                    if "Continue Monitoring" in REVIEWER_INCIDENT_ACTIONS
+                    else 0,
+                )
+                rationale = st.text_area(
+                    "Reviewer rationale",
+                    value="Scenario reviewed for viva validation. Final determination remains with authorised human reviewer.",
+                )
+                submitted = st.form_submit_button("Record reviewer action")
+            if submitted:
+                if not rationale.strip():
+                    st.error("Reviewer rationale is required.")
+                else:
+                    review_id = record_viva_reviewer_decision(selected_run_id, role, reviewer_action, rationale)
+                    log_audit(role, "viva_reviewer_decision", review_id, f"scenario_run={selected_run_id}; action={reviewer_action}")
+                    clear_app_caches()
+                    st.success(f"Reviewer action recorded: {review_id}.")
+                    st.rerun()
+        elif run.get("reviewer_decision_recorded"):
+            st.success("Reviewer action has been recorded for this scenario run.")
+
+        if decision_id and has_permission(role, "export_reports"):
+            package = build_evidence_package(decision_id)
+            package["viva_scenario_validation"] = run
+            st.download_button(
+                "Download scenario evidence package JSON",
+                data=json.dumps(package, indent=2, default=str),
+                file_name=f"{selected_run_id}_scenario_evidence_package.json",
+                mime="application/json",
+                width="content",
+            )
+
+
 def monitoring_panel(role: str, session_id: str | None) -> None:
     st.subheader("Live Monitoring and Demo Events")
     selected_session_id, selected_candidate_id = monitoring_session_selector()
@@ -2741,6 +2910,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     if not session_id:
         st.info("Start or select a session to generate monitoring events.")
         return
+    viva_scenario_validation_panel(role, session_id, candidate_id)
     contextual_intelligence_panel(role, session_id, candidate_id)
     camera_stream_foundation_panel(role, session_id, candidate_id)
     visual_intelligence_panel(role, session_id, candidate_id)
@@ -3111,6 +3281,50 @@ def reports_panel(role: str, session_id: str | None) -> None:
             st.caption("Incident evidence-package export is available to Admin and Reviewer roles.")
     else:
         st.info("No institutional incident decisions match the selected filters.")
+
+    scenario_runs = cached_viva_scenario_runs(selected_session_id)
+    if selected_candidate_id:
+        scenario_runs = [
+            run for run in scenario_runs if str(run.get("candidate_id")) == selected_candidate_id
+        ]
+    if selected_risk != "All risk levels":
+        scenario_runs = [
+            run for run in scenario_runs if str(run.get("actual_risk_level")) == selected_risk
+        ]
+    st.write("Viva Scenario Validation Summary")
+    if scenario_runs:
+        scenario_frame = pd.DataFrame(scenario_runs)
+        summary_columns = [
+            "run_id",
+            "scenario_name",
+            "session_id",
+            "candidate_id",
+            "expected_risk_level",
+            "actual_risk_level",
+            "expected_policy_response",
+            "actual_policy_response",
+            "pass_status",
+            "acknowledgement_required",
+            "acknowledgement_recorded",
+            "reviewer_decision_recorded",
+            "final_outcome_status",
+            "created_at",
+        ]
+        st.dataframe(
+            scenario_frame[[column for column in summary_columns if column in scenario_frame.columns]],
+            width="stretch",
+            hide_index=True,
+        )
+        if has_permission(role, "export_reports"):
+            st.download_button(
+                "Download viva scenario validation summary JSON",
+                data=json.dumps(scenario_runs, indent=2, default=str),
+                file_name="viva_scenario_validation_summary.json",
+                mime="application/json",
+                width="content",
+            )
+    else:
+        st.info("No viva scenario validation records match the selected filters.")
 
     export_session_id = selected_session_id or session_id
     if export_session_id and has_permission(role, "export_reports") and st.button("Export selected session JSON report"):

@@ -165,6 +165,16 @@
 - Added incident evidence-package JSON export in Reports with candidate/session metadata, contextual risk, contributing events, candidate acknowledgement, reviewer action, and audit reference note.
 - Candidate-facing wording avoids misconduct conclusions and preserves due process: the system reports a potential examination integrity concern for authorised human review.
 
+## End-to-End Viva Scenario Validation
+
+- Added a controlled viva scenario validation harness that exercises the frozen governance pipeline end to end without introducing a new reasoning layer.
+- Added 10 evaluation scenarios covering normal candidate behaviour, brief gaze deviation, repeated gaze deviation, mobile-phone evidence, background speech, multiple persons, repeated face absence, identity mismatch, suspicious camera disconnection, and a critical combined multimodal incident.
+- Each scenario persists raw evidence events, invokes the existing Contextual Intelligence Engine, invokes Agentic Decision Support, evaluates IPIME policy-as-code, and stores expected-vs-actual validation output.
+- Monitoring now exposes scenario selection, scenario execution, generated evidence, CIE risk/explanation, Agentic priority, IPIME response, candidate acknowledgement capture where required, reviewer action, and scenario evidence-package export.
+- Reports now include a Viva Scenario Validation Summary table for Chapter 5 evaluation and viva demonstration records.
+- Added pytest coverage for low-risk behaviour, isolated-event suppression, repeated-event escalation, multimodal escalation, critical acknowledgement workflow, IPIME human-review boundary, acknowledgement persistence, reviewer decision persistence, and summary traceability.
+- Scenario wording and records remain validation traces only; they must not be presented as production cheating labels or final misconduct determinations.
+
 ## Prototype Limitations
 
 - Face recognition, voice verification, camera feeds, and YOLO detection are represented by prototype/demo event flows at this stage.

@@ -6,7 +6,7 @@ Baseline implementation commit verified before this report: `0d284a1 ai: integra
 ## Verification Snapshot
 
 - `python -m py_compile app.py`: passed.
-- `python -m pytest -q`: passed, `53 passed` after IPIME foundation tests were added.
+- `python -m pytest -q`: passed, `61 passed` after end-to-end viva scenario validation tests were added.
 - Streamlit startup smoke test: HTTP `200` on local probe.
 - Startup warnings/tracebacks: no deprecated `use_container_width` warning observed; no Windows `WinError 10054` traceback observed in captured startup log.
 - Camera on page load: no camera activation path is invoked at startup. Camera/image analysis remains user-triggered.
@@ -40,6 +40,24 @@ Baseline implementation commit verified before this report: `0d284a1 ai: integra
 | 23 | Privacy/security/audit | Partially Implemented | Consent, camera privacy rule, audit trail, immutable raw events, local-first SQLite, and role simulator warnings are implemented. | No production authentication, encryption-at-rest, RBAC provider, or retention automation. | `app.py`, `src/storage/*`, `README.md` | Document clearly in Chapter 4/5; add minimal retention/privacy notes to final report. |
 | 24 | Streamlit dashboard | Implemented | Home, navigation, SERPS branding, staged enrolment/session flows, Monitoring CIE console, Review, Reports, and footer are operational. | Streamlit is not suitable as the real monitoring engine for continuous camera/audio streams. | `app.py`, README, smoke test | Keep as operations dashboard; move inference into services. |
 | 25 | Viva/demo readiness | Partially Implemented | End-to-end demo flow exists: enrol, authenticate, check devices, start session, generate/live-analyse events, CIE reasoning, review, report. | Live continuous AI is still partial; manual fallback remains necessary for reliability. | `README.md`, `docs/development_log.md`, tests | Run scripted demo rehearsals and seed clean data before viva. |
+
+## End-to-End Viva Scenario Validation Addendum
+
+SERPS now includes a controlled evaluation harness for Chapter 5 and viva demonstration. The harness exercises the frozen governance pipeline without adding a new reasoning layer:
+
+```text
+Structured Evidence Events
+-> Contextual Intelligence Engine
+-> Agentic Decision Support
+-> Institutional Policy & Incident Management Engine
+-> Candidate Acknowledgement where required
+-> Human Reviewer
+-> Final Outcome / Report Trace
+```
+
+The Monitoring page exposes 10 realistic validation scenarios, including normal behaviour, isolated looking away, repeated gaze deviation, mobile-phone evidence, background speech, multiple persons, repeated face absence, identity mismatch, suspicious camera disconnection, and a critical combined multimodal case. Each scenario records expected risk, actual risk, expected policy response, actual policy response, acknowledgement state, reviewer-decision state, pass/needs-review status, and final outcome status in SQLite. Reports include a Viva Scenario Validation Summary table for evaluation evidence.
+
+These scenarios are controlled validation cases only. They are not production cheating labels and do not make final examination decisions.
 
 ## Remaining Critical Gaps Before Viva
 

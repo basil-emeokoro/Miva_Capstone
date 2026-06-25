@@ -187,6 +187,28 @@ CREATE TABLE IF NOT EXISTS reviewer_incident_decisions (
     FOREIGN KEY(decision_id) REFERENCES policy_decisions(decision_id)
 );
 
+CREATE TABLE IF NOT EXISTS viva_scenario_runs (
+    run_id TEXT PRIMARY KEY,
+    scenario_id TEXT NOT NULL,
+    scenario_name TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    candidate_id TEXT NOT NULL,
+    alert_id TEXT,
+    policy_decision_id TEXT,
+    expected_risk_level TEXT NOT NULL,
+    actual_risk_level TEXT NOT NULL,
+    expected_policy_response TEXT NOT NULL,
+    actual_policy_response TEXT NOT NULL,
+    agent_recommendation TEXT NOT NULL,
+    acknowledgement_required INTEGER NOT NULL DEFAULT 0,
+    acknowledgement_recorded INTEGER NOT NULL DEFAULT 0,
+    reviewer_decision_recorded INTEGER NOT NULL DEFAULT 0,
+    final_outcome_status TEXT NOT NULL,
+    pass_status TEXT NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     audit_id TEXT PRIMARY KEY,
     actor TEXT NOT NULL,
@@ -217,6 +239,7 @@ def initialize_database(path: str | Path | None = None) -> None:
         _ensure_candidate_columns(connection)
         _ensure_fused_alert_columns(connection)
         _ensure_policy_decision_columns(connection)
+        _ensure_viva_scenario_columns(connection)
 
 
 def fetch_all(query: str, params: Iterable[object] = ()) -> list[sqlite3.Row]:
@@ -270,3 +293,18 @@ def _ensure_policy_decision_columns(connection: sqlite3.Connection) -> None:
     for column, definition in required_columns.items():
         if column not in existing:
             connection.execute(f"ALTER TABLE policy_decisions ADD COLUMN {column} {definition}")
+
+
+def _ensure_viva_scenario_columns(connection: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in connection.execute("PRAGMA table_info(viva_scenario_runs)").fetchall()}
+    required_columns = {
+        "agent_recommendation": "TEXT NOT NULL DEFAULT ''",
+        "acknowledgement_required": "INTEGER NOT NULL DEFAULT 0",
+        "acknowledgement_recorded": "INTEGER NOT NULL DEFAULT 0",
+        "reviewer_decision_recorded": "INTEGER NOT NULL DEFAULT 0",
+        "final_outcome_status": "TEXT NOT NULL DEFAULT 'pending_human_review'",
+        "notes": "TEXT",
+    }
+    for column, definition in required_columns.items():
+        if column not in existing:
+            connection.execute(f"ALTER TABLE viva_scenario_runs ADD COLUMN {column} {definition}")

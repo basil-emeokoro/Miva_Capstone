@@ -154,6 +154,15 @@ Addenda 3 and 4 elevate the previous Event Fusion Engine into a broader Contextu
 - Reviewers can record incident actions: Observe, Continue Monitoring, Issue Warning, Escalate, Refer to Senior Reviewer, or Close Incident.
 - Reports can export a structured incident evidence package containing candidate/session metadata, contextual risk, contributing evidence, candidate acknowledgement, reviewer action, and audit references.
 
+## End-to-End Viva Scenario Validation
+
+- Monitoring includes a Viva Scenario Validation panel for controlled Chapter 5/viva evaluation.
+- The panel runs realistic scenarios such as normal behaviour, brief looking away, repeated gaze deviation, mobile-phone detection, background speech, multiple persons, repeated face absence, identity mismatch, camera disconnection during suspicious activity, and a critical combined scenario.
+- Each scenario generates immutable structured `EvidenceEvent` records, runs the existing Contextual Intelligence Engine, invokes Agentic Decision Support, evaluates IPIME policy, and stores a validation summary.
+- Where policy requires it, the scenario flow can record a candidate incident acknowledgement and reviewer incident action.
+- Reports include a Viva Scenario Validation Summary table with expected risk, actual risk, expected policy response, actual policy response, pass/needs-review status, acknowledgement state, reviewer state, and final outcome status.
+- These scenarios are controlled validation cases for demonstration and dissertation evaluation. They are not production cheating labels and do not replace authorised human review.
+
 ## Monitoring Roadmap
 
 The Monitoring module is still a controlled prototype. Future implementation should support single-candidate view, grouped candidate/session view, multi-session analytics, visual dashboards, flagged-candidate classification, event distribution, risk-level summaries, reviewer/proctor queues, and Agentic AI prioritisation of infringements.
