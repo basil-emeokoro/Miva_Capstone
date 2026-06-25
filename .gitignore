@@ -7,6 +7,10 @@ env/
 .env
 System Specification.pdf
 docs/implementation_addendum.md
+docs/chapter*_revision_guidance.md
+docs/*dissertation*
+docs/*thesis*
+.private/
 data/proctoring.db
 data/enrolment/*
 !data/enrolment/.gitkeep

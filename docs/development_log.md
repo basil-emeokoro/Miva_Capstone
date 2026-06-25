@@ -163,3 +163,9 @@
 - The test player is intentionally lightweight and is not a production examination engine.
 - RBAC is local prototype authorization, not enterprise identity management.
 - Monitoring remains a prototype module. Future work should add single-candidate view, grouped candidate/session view, multiple session analytics, visual dashboards, flagged candidate classification, event distribution, risk summary, reviewer/proctor queue, and Agentic AI prioritisation of infringements.
+
+## Repository Discipline
+
+- The repository should contain SERPS implementation code, software architecture documentation, tests, runtime configuration, README content, and development documentation only.
+- Private thesis/report drafting guidance should remain outside the tracked implementation repository unless explicitly approved for publication.
+- Private dissertation-writing guidance, chapter revision notes, and report-preparation drafts are ignored to prevent accidental commits.
