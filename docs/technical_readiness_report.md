@@ -1,7 +1,7 @@
 # SERPS Technical Readiness Report
 
-Date: 2026-06-25  
-Baseline implementation commit verified before this report: `0d284a1 ai: integrate live perception modules with contextual intelligence engine`
+Date: 2026-06-26  
+Baseline implementation commit verified before this report: `7351d34 evaluation: add end-to-end viva scenario validation`
 
 ## Verification Snapshot
 
@@ -10,6 +10,88 @@ Baseline implementation commit verified before this report: `0d284a1 ai: integra
 - Streamlit startup smoke test: HTTP `200` on local probe.
 - Startup warnings/tracebacks: no deprecated `use_container_width` warning observed; no Windows `WinError 10054` traceback observed in captured startup log.
 - Camera on page load: no camera activation path is invoked at startup. Camera/image analysis remains user-triggered.
+
+## Feature Complete Readiness Audit
+
+This audit determines whether SERPS is ready to enter final polish and dissertation artefact automation. It does not introduce new features; it classifies the current implementation against the frozen Version 1.0 architecture.
+
+| # | Area | Readiness classification | Audit finding | Recommended action |
+| --- | --- | --- | --- | --- |
+| 1 | Enrolment and consent | Ready for viva | Institution-aware biodata, consent capture, draft/registered states, duplicate validation, and biodata-before-face-capture gating are implemented. | Freeze behaviour; polish labels only if final rehearsal exposes wording issues. |
+| 2 | Facial enrolment | Needs minor polish | Guided multi-direction capture, stored samples, quality records, and profile display work. Continuous AI-guided auto-capture remains limited by Streamlit camera input. | Keep browser fallback for viva; document WebRTC/FastAPI path for production-grade capture. |
+| 3 | Authentication | Needs minor polish | Session start is gated by candidate authentication or explicit staff override. Face verification is functional as a local prototype. | Strengthen liveness and periodic re-authentication after final polish. |
+| 4 | Device/environment checks | Ready for viva | Mode-aware checks, SQLite persistence, override, audit, and session gate integration are implemented. | Keep stable; use clean demo records for final viva. |
+| 5 | Monitoring Mode Controller | Ready for viva | Modes A, B, and C correctly affect device requirements, camera requirements, and monitoring guidance. | Freeze as the policy contract for monitoring and session checks. |
+| 6 | Dual-camera foundation | Ready for viva | Primary/secondary camera selectors, requirement cards, readiness controls, health events, persistence, and Reports visibility are implemented without page-load camera activation. | Leave manual/prototype hooks available until real stream workers are introduced. |
+| 7 | Visual intelligence | Needs minor polish | Structured visual events, still-frame analysis, OpenCV fallback, optional object hooks, and Monitoring controls exist. | Improve MediaPipe/YOLO live integration after final polish; do not change architecture. |
+| 8 | Audio intelligence | Needs minor polish | Audio feature analysis and structured audio events exist for background speech, prolonged speech, silence, noise, and suspicious patterns. | Add microphone/VAD integration later through service boundary. |
+| 9 | Identity assurance | Needs minor polish | Identity events and authentication confidence signals feed the evidence pipeline. | Add periodic identity worker and stronger substitution checks later. |
+| 10 | Structured evidence events | Ready for viva | Camera, visual, audio, identity, scenario, and system events use the common immutable evidence-event schema. | Keep schema stable; add taxonomy entries only when detectors mature. |
+| 11 | CIE | Ready for viva | Contextual Intelligence Engine performs fusion, temporal memory, risk scoring, reasoning, explanations, and reviewer recommendations. | Tune wording and thresholds only through controlled scenario tests. |
+| 12 | Agentic Decision Support | Ready for viva | Agentic recommendations are generated from contextual risk and passed into the governance workflow. | Keep recommendations advisory; avoid autonomous final decisions. |
+| 13 | IPIME | Ready for viva | Configurable institution policy workflow translates CIE/agent output into procedural responses without deciding guilt. | Keep policy-as-code model; add institution templates only if required for viva examples. |
+| 14 | Candidate Incident Acknowledgement | Ready for viva | Candidate incident acknowledgement, neutral due-process wording, explanation capture, timestamps, and incident package linkage are implemented. | Rehearse one high/critical scenario to confirm panel-facing clarity. |
+| 15 | Human Review | Needs minor polish | Review page supports CIE alerts, evidence, explanations, reviewer actions, rationale, and final outcome trace. | Polish queue labels and reviewer action wording before viva. |
+| 16 | Reports/export | Needs minor polish | Reports show raw events, contextual alerts, risk timeline, scenario validation, and exportable evidence traces. | Improve final evidence-pack/report presentation during polish. |
+| 17 | Viva scenario validation | Ready for viva | Ten controlled end-to-end scenarios validate raw evidence, CIE reasoning, agent recommendation, IPIME response, acknowledgement, review, and traceability. | Use these scenarios as Chapter 5 evaluation evidence. |
+| 18 | FastAPI service boundary | Needs minor polish | Structured event ingestion and AI analysis endpoints exist; Streamlit remains the dashboard. | Document service startup and keep AI inference outside Streamlit where practical. |
+| 19 | Privacy/security/audit | Needs minor polish | Consent, camera privacy, immutable evidence, audit trail, role-simulator warning, and local-first persistence are implemented. | Clearly document prototype limits: no enterprise SSO, hardened RBAC, encryption-at-rest, or retention automation. |
+| 20 | Dashboard usability | Needs minor polish | Home, navigation, staged workflows, CIE console, Monitoring, Review, Reports, and footer are functional and viva-readable. | Final polish should reduce demo data clutter and tighten labels. |
+| 21 | Test coverage | Ready for viva | Unit/integration tests cover candidate integrity, camera events, visual/audio/identity events, CIE, IPIME, and viva scenarios. | Maintain tests; add only regression tests for final polish fixes. |
+| 22 | Runtime stability | Ready for viva | Compile/tests pass in the current baseline; deprecated Streamlit width warnings and Windows disconnect noise were addressed. | Continue final smoke tests on the viva machine. |
+| 23 | Remaining prototype limitations | Future enhancement | Continuous production-grade AI streaming, enterprise authentication, hardened storage, and scalable multi-session operations are beyond the current prototype scope. | Describe honestly in Chapter 4/5 and position as deployment work. |
+
+### Top 10 Remaining Issues
+
+1. Continuous camera and audio streams are not yet production-live; manual/demo controls remain necessary.
+2. MediaPipe landmark-driven gaze/head-pose detection needs stronger live integration.
+3. YOLO object detection depends on optional local model/package availability.
+4. Live microphone/VAD capture is not yet connected to the dashboard flow.
+5. Continuous identity assurance is not yet running as a background verification loop.
+6. Evidence-pack and report exports need final presentation polish.
+7. Reviewer workflow is local-prototype level, not multi-user enterprise workflow.
+8. FastAPI boundaries exist, but AI services are not yet deployed as independent long-running workers.
+9. Demo SQLite data can accumulate old sessions, events, and scenario records unless curated before viva.
+10. Private dissertation/report files must remain untracked and outside the public implementation repository.
+
+### Top 5 Viva Risks
+
+1. Live hardware variability: browser permissions, lighting, or camera availability may affect live AI demonstrations.
+2. AI detector variability: optional YOLO/MediaPipe/audio dependencies may not behave consistently on every machine.
+3. Data clutter: repeated testing can leave old sessions and alerts that make the demo harder to explain.
+4. Governance misunderstanding: panel members may misread SERPS as an automatic malpractice decision system unless the human-review boundary is emphasised.
+5. Streamlit constraints: reruns and browser-camera limits can make continuous monitoring appear less live than the architecture supports.
+
+### Recommended Final Polish Sprint
+
+The next sprint should be a final polish sprint, not a new architecture sprint:
+
+- Curate or reset demo data so viva scenarios start from a clean state.
+- Polish Monitoring, Review, Reports, and incident acknowledgement wording for non-developer panel members.
+- Improve evidence-pack/report display and export naming.
+- Confirm all scenario groups demonstrate low, medium, high, and critical pathways.
+- Add only regression tests for defects found during rehearsal.
+- Run full browser smoke testing on the intended demonstration machine.
+- Reconfirm no private dissertation artefacts are tracked.
+
+### Dissertation Automation Readiness
+
+Dissertation artefact automation can begin after the final polish sprint. The implementation is now feature-complete enough to support Chapter 4/5 evidence generation because the complete governance pipeline is present, scenario validation is implemented, and Reports expose traceable raw events, contextual alerts, policy responses, acknowledgements, and reviewer outcomes.
+
+Automation should consume implementation evidence and controlled scenario outputs. It should not introduce new architecture or commit private dissertation drafts into the software repository.
+
+### Private / Untracked File Discipline
+
+The following must remain untracked/private unless explicitly approved:
+
+- `System Specification.pdf`
+- `Dissertation-Requirements.docx`
+- `Dissertation-Requirements.pdf`
+- `docs/chapter3_revision_guidance.md`
+- `.private/`
+- dissertation drafts, supervisor notes, thesis writing guidance, private addenda, and report-planning materials
+
+The repository should contain only SERPS source code, tests, runtime configuration, software architecture documentation, implementation documentation, README/release material, and approved development logs.
 
 ## Subsystem Readiness
 
