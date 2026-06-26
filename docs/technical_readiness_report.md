@@ -6,7 +6,7 @@ Baseline implementation commit verified before this report: `7351d34 evaluation:
 ## Verification Snapshot
 
 - `python -m py_compile app.py`: passed.
-- `python -m pytest -q`: passed, `61 passed` after end-to-end viva scenario validation tests were added.
+- `python -m pytest -q`: passed, `62 passed` after final polish report-export coverage was added.
 - Streamlit startup smoke test: HTTP `200` on local probe.
 - Startup warnings/tracebacks: no deprecated `use_container_width` warning observed; no Windows `WinError 10054` traceback observed in captured startup log.
 - Camera on page load: no camera activation path is invoked at startup. Camera/image analysis remains user-triggered.
@@ -79,6 +79,24 @@ The next sprint should be a final polish sprint, not a new architecture sprint:
 Dissertation artefact automation can begin after the final polish sprint. The implementation is now feature-complete enough to support Chapter 4/5 evidence generation because the complete governance pipeline is present, scenario validation is implemented, and Reports expose traceable raw events, contextual alerts, policy responses, acknowledgements, and reviewer outcomes.
 
 Automation should consume implementation evidence and controlled scenario outputs. It should not introduce new architecture or commit private dissertation drafts into the software repository.
+
+### Final Polish Sprint Resolution
+
+The final polish sprint reduced viva risk without changing the frozen architecture:
+
+- Viva scenario validation now presents a clearer SERPS governance pipeline trace from structured evidence through CIE, Agentic Decision Support, IPIME, candidate acknowledgement, human review, and report/audit trace.
+- Reviewer workflow wording now frames decisions as authorised human review outcomes, requires reviewer rationale, and avoids any automatic misconduct conclusion.
+- Candidate incident acknowledgement wording was reinforced as a due-process step for a potential integrity concern, not a finding of guilt.
+- Session JSON reports now include policy decisions, viva scenario validation runs, evidence-pack manifests, due-process notes, and human-review boundary language.
+- Report/evidence package downloads are labelled more clearly for viva demonstration and incident traceability.
+- Test coverage was expanded to verify that session reports include governance and due-process sections.
+
+Remaining items are future enhancements rather than blockers for viva:
+
+- Continuous browser camera/audio monitoring should move to WebRTC/FastAPI/OpenCV workers.
+- MediaPipe, YOLO, VAD, and continuous identity assurance should be strengthened after the viva-ready prototype is frozen.
+- Enterprise authentication, hardened RBAC, encryption-at-rest, retention automation, and multi-reviewer production workflow remain deployment concerns.
+- PDF-quality formal evidence packs can be added after the JSON evidence trail is accepted.
 
 ### Private / Untracked File Discipline
 

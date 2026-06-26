@@ -2807,7 +2807,31 @@ def viva_scenario_validation_panel(role: str, session_id: str, candidate_id: str
         summary_columns[2].metric("Expected policy", str(run.get("expected_policy_response")))
         summary_columns[3].metric("Actual policy", str(run.get("actual_policy_response")))
         summary_columns[4].metric("Status", str(run.get("pass_status")))
+        if str(run.get("pass_status")) == "Pass":
+            st.success("Scenario output matches the expected viva validation pathway.")
+        else:
+            st.warning("Scenario output needs review before viva. Compare the expected and actual risk/policy responses.")
         st.caption(str(run.get("notes") or "Controlled viva validation scenario."))
+
+        pipeline_rows = [
+            {"pipeline stage": "Structured evidence events", "status": "Recorded", "detail": "Raw EvidenceEvent rows were generated for this scenario."},
+            {"pipeline stage": "Contextual Intelligence Engine", "status": "Recorded", "detail": f"Alert {run.get('alert_id')} captured contextual reasoning."},
+            {"pipeline stage": "Agentic Decision Support", "status": "Recorded", "detail": str(run.get("agent_recommendation") or "Recommendation unavailable")},
+            {"pipeline stage": "IPIME policy response", "status": "Recorded", "detail": str(run.get("actual_policy_response") or "Policy response unavailable")},
+            {
+                "pipeline stage": "Candidate acknowledgement",
+                "status": "Required" if run.get("acknowledgement_required") else "Not required",
+                "detail": "Recorded" if run.get("acknowledgement_recorded") else "Pending or not required",
+            },
+            {
+                "pipeline stage": "Human reviewer action",
+                "status": "Recorded" if run.get("reviewer_decision_recorded") else "Pending",
+                "detail": str(run.get("final_outcome_status") or "Awaiting reviewer action"),
+            },
+            {"pipeline stage": "Report/audit trace", "status": "Available", "detail": "Run, evidence, policy, acknowledgement, and reviewer records are persisted."},
+        ]
+        with st.expander("SERPS governance pipeline trace", expanded=True):
+            st.dataframe(pd.DataFrame(pipeline_rows), width="stretch", hide_index=True)
 
         alert = next((item for item in cached_alerts(session_id) if str(item.get("alert_id")) == str(run.get("alert_id"))), None)
         if alert:
@@ -2842,6 +2866,10 @@ def viva_scenario_validation_panel(role: str, session_id: str, candidate_id: str
                 st.caption(", ".join(ensure_list(decision.get("recommended_actions"))))
 
         if run.get("acknowledgement_required") and not run.get("acknowledgement_recorded"):
+            st.warning(
+                "Candidate-facing due-process step: this is an acknowledgement of a potential integrity concern, "
+                "not a misconduct finding."
+            )
             with st.form(f"viva_ack_{selected_run_id}"):
                 explanation = st.text_area(
                     "Candidate acknowledgement explanation",
@@ -2865,6 +2893,7 @@ def viva_scenario_validation_panel(role: str, session_id: str, candidate_id: str
             st.success("Candidate acknowledgement has been recorded for this scenario run.")
 
         if has_permission(role, "review_alerts") and not run.get("reviewer_decision_recorded"):
+            st.caption("Reviewer action records the authorised human response. SERPS does not make final examination decisions.")
             with st.form(f"viva_reviewer_{selected_run_id}"):
                 reviewer_action = st.selectbox(
                     "Reviewer scenario action",
@@ -2993,6 +3022,9 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
 
 def alert_review_panel(role: str, session_id: str | None) -> None:
     st.subheader("CIE-Generated Alerts and Human Review")
+    st.caption(
+        "Reviewers inspect CIE-generated evidence, record procedural outcomes, and remain responsible for final decisions."
+    )
     if not session_id:
         st.info("Select a session to review alerts.")
         return
@@ -3039,12 +3071,26 @@ def alert_review_panel(role: str, session_id: str | None) -> None:
     render_ipime_review_panel(role, selected_alert)
 
     if has_permission(role, "review_alerts"):
-        decision = st.selectbox("Decision", ["accepted", "rejected", "escalated"], key="review_decision_select")
-        comment = st.text_area("Reviewer comment")
+        decision_labels = {
+            "accepted": "Accept alert as a valid review concern",
+            "rejected": "Reject alert / mark as false positive",
+            "escalated": "Escalate for senior review",
+        }
+        selected_decision_label = st.selectbox(
+            "Reviewer alert outcome",
+            list(decision_labels.values()),
+            key="review_decision_select",
+        )
+        decision = next(key for key, label in decision_labels.items() if label == selected_decision_label)
+        st.caption("This outcome updates the alert review status only. It is not an automatic misconduct decision.")
+        comment = st.text_area("Reviewer rationale")
         if st.button("Submit reviewer decision"):
-            record_review(alert_id, role, decision, comment)
-            clear_app_caches()
-            st.success("Reviewer decision recorded.")
+            if not comment.strip():
+                st.error("Reviewer rationale is required before recording the decision.")
+            else:
+                record_review(alert_id, role, decision, comment)
+                clear_app_caches()
+                st.success("Reviewer decision recorded.")
     else:
         st.info("Only Admin or Reviewer roles can submit final alert decisions.")
     return_to_top()
@@ -3271,11 +3317,15 @@ def reports_panel(role: str, session_id: str | None) -> None:
         if has_permission(role, "export_reports"):
             package = build_evidence_package(package_decision_id)
             st.download_button(
-                "Download incident evidence package JSON",
+                "Download selected incident evidence package JSON",
                 data=json.dumps(package, indent=2, default=str),
                 file_name=f"{package_decision_id}_evidence_package.json",
                 mime="application/json",
                 width="content",
+            )
+            st.caption(
+                "Package includes candidate profile, session metadata, CIE assessment, contributing evidence, "
+                "IPIME decision, candidate acknowledgement, and reviewer action records where available."
             )
         else:
             st.caption("Incident evidence-package export is available to Admin and Reviewer roles.")

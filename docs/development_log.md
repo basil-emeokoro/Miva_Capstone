@@ -175,6 +175,16 @@
 - Added pytest coverage for low-risk behaviour, isolated-event suppression, repeated-event escalation, multimodal escalation, critical acknowledgement workflow, IPIME human-review boundary, acknowledgement persistence, reviewer decision persistence, and summary traceability.
 - Scenario wording and records remain validation traces only; they must not be presented as production cheating labels or final misconduct determinations.
 
+## Final Polish Sprint
+
+- Preserved the frozen SERPS architecture and avoided new architecture or scope expansion.
+- Improved the Monitoring viva scenario panel with a visible governance pipeline trace covering structured evidence, CIE, Agentic Decision Support, IPIME, candidate acknowledgement, human review, and report/audit trace.
+- Strengthened reviewer workflow wording so reviewer decisions are framed as human procedural outcomes, require rationale, and do not imply automatic misconduct findings.
+- Clarified candidate acknowledgement as a due-process response to a potential examination integrity concern rather than an admission or system verdict.
+- Expanded session JSON reports with policy decisions, viva scenario validation records, evidence-package manifest entries, due-process notes, and human-review boundary language.
+- Added focused pytest coverage for governance-aware session report contents.
+- Confirmed camera inputs remain behind explicit capture, preview, or authentication controls; no camera opens on Home/page load.
+
 ## Prototype Limitations
 
 - Face recognition, voice verification, camera feeds, and YOLO detection are represented by prototype/demo event flows at this stage.
