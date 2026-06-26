@@ -1,0 +1,162 @@
+{
+  "scenarios": [
+    {
+      "description": "Candidate remains visible with healthy camera context and no suspicious multimodal evidence.",
+      "event_count": 2,
+      "event_types": [
+        "face_present",
+        "camera_ready"
+      ],
+      "expected_policy_response": "Generic observation workflow",
+      "expected_risk_level": "Low",
+      "final_outcome_status": "low_risk_observation",
+      "name": "Normal candidate behaviour",
+      "notes": "Low-risk CIE observation is persisted so the full governance path can be demonstrated without creating a misconduct finding.",
+      "policy_profile": "Generic",
+      "reviewer_action": "Observe",
+      "scenario_id": "normal_candidate_behaviour"
+    },
+    {
+      "description": "A single gaze deviation is logged but should not trigger severe policy action.",
+      "event_count": 1,
+      "event_types": [
+        "looking_away"
+      ],
+      "expected_policy_response": "Generic observation workflow",
+      "expected_risk_level": "Low",
+      "final_outcome_status": "observe_only",
+      "name": "Brief looking away",
+      "notes": "",
+      "policy_profile": "Generic",
+      "reviewer_action": "Observe",
+      "scenario_id": "brief_looking_away"
+    },
+    {
+      "description": "Repeated looking-away events demonstrate temporal behaviour memory and reviewer warning flow.",
+      "event_count": 4,
+      "event_types": [
+        "looking_away"
+      ],
+      "expected_policy_response": "University warning and review workflow",
+      "expected_risk_level": "Medium",
+      "final_outcome_status": "warning_issued_for_review",
+      "name": "Repeated gaze deviation",
+      "notes": "",
+      "policy_profile": "Miva",
+      "reviewer_action": "Issue Warning",
+      "scenario_id": "repeated_gaze_deviation"
+    },
+    {
+      "description": "Object detection evidence produces a high-risk institutional incident acknowledgement workflow.",
+      "event_count": 1,
+      "event_types": [
+        "mobile_phone_detected"
+      ],
+      "expected_policy_response": "WAEC incident acknowledgement workflow",
+      "expected_risk_level": "High",
+      "final_outcome_status": "awaiting_reviewer_assessment",
+      "name": "Mobile phone detected",
+      "notes": "",
+      "policy_profile": "WAEC",
+      "reviewer_action": "Escalate",
+      "scenario_id": "mobile_phone_detected"
+    },
+    {
+      "description": "Audio speech evidence alone should be reviewable but not automatically severe.",
+      "event_count": 1,
+      "event_types": [
+        "background_speech"
+      ],
+      "expected_policy_response": "University warning and review workflow",
+      "expected_risk_level": "Medium",
+      "final_outcome_status": "flagged_for_later_review",
+      "name": "Background speech during exam",
+      "notes": "",
+      "policy_profile": "Miva",
+      "reviewer_action": "Continue Monitoring",
+      "scenario_id": "background_speech"
+    },
+    {
+      "description": "Visual evidence indicates another person may be present in the monitoring scene.",
+      "event_count": 1,
+      "event_types": [
+        "multiple_persons_detected"
+      ],
+      "expected_policy_response": "WAEC incident acknowledgement workflow",
+      "expected_risk_level": "High",
+      "final_outcome_status": "awaiting_reviewer_assessment",
+      "name": "Multiple persons detected",
+      "notes": "",
+      "policy_profile": "WAEC",
+      "reviewer_action": "Escalate",
+      "scenario_id": "multiple_persons_detected"
+    },
+    {
+      "description": "Repeated face absence should raise risk through temporal memory while preserving human review.",
+      "event_count": 4,
+      "event_types": [
+        "face_absent"
+      ],
+      "expected_policy_response": "University warning and review workflow",
+      "expected_risk_level": "Medium",
+      "final_outcome_status": "flagged_for_reviewer_attention",
+      "name": "Candidate face absent repeatedly",
+      "notes": "",
+      "policy_profile": "Miva",
+      "reviewer_action": "Continue Monitoring",
+      "scenario_id": "repeated_face_absent"
+    },
+    {
+      "description": "Identity assurance reports a face mismatch and candidate substitution signal.",
+      "event_count": 2,
+      "event_types": [
+        "face_mismatch",
+        "identity_substitution"
+      ],
+      "expected_policy_response": "Generic critical-risk senior review workflow",
+      "expected_risk_level": "Critical",
+      "final_outcome_status": "senior_reviewer_required",
+      "name": "Candidate substitution / identity mismatch",
+      "notes": "",
+      "policy_profile": "Generic",
+      "reviewer_action": "Refer to Senior Reviewer",
+      "scenario_id": "identity_mismatch"
+    },
+    {
+      "description": "Camera health evidence combines with visual and audio evidence to demonstrate multimodal escalation.",
+      "event_count": 3,
+      "event_types": [
+        "camera_disconnected",
+        "background_speech",
+        "looking_away"
+      ],
+      "expected_policy_response": "WAEC incident acknowledgement workflow",
+      "expected_risk_level": "High",
+      "final_outcome_status": "awaiting_reviewer_assessment",
+      "name": "Camera disconnected during suspicious activity",
+      "notes": "",
+      "policy_profile": "WAEC",
+      "reviewer_action": "Escalate",
+      "scenario_id": "camera_disconnected_suspicious"
+    },
+    {
+      "description": "Phone, second person, background speech, face absence, and identity confidence drop occur in one window.",
+      "event_count": 5,
+      "event_types": [
+        "mobile_phone_detected",
+        "multiple_persons_detected",
+        "background_speech",
+        "face_absent",
+        "face_mismatch"
+      ],
+      "expected_policy_response": "Generic critical-risk senior review workflow",
+      "expected_risk_level": "Critical",
+      "final_outcome_status": "senior_reviewer_required",
+      "name": "Critical combined scenario",
+      "notes": "",
+      "policy_profile": "Generic",
+      "reviewer_action": "Refer to Senior Reviewer",
+      "scenario_id": "critical_combined"
+    }
+  ]
+}

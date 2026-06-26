@@ -200,3 +200,16 @@
 - The repository should contain SERPS implementation code, software architecture documentation, tests, runtime configuration, README content, and development documentation only.
 - Private thesis/report drafting guidance should remain outside the tracked implementation repository unless explicitly approved for publication.
 - Private dissertation-writing guidance, chapter revision notes, and report-preparation drafts are ignored to prevent accidental commits.
+
+## Documentation Automation Framework Sprint 1
+
+- Added a documentation automation foundation that makes SERPS a self-documenting research platform without changing the frozen architecture.
+- Added `scripts/docs/package_dissertation_assets.py` as the single command for rebuilding implementation-derived dissertation artefacts.
+- Created `docs/dissertation/` with Chapter Three, Chapter Four, Chapter Five, captions, and manifest output areas.
+- Generated editable Mermaid sources for high-level architecture, layered architecture, system workflow, use case, activity, sequence, ERD, system flowchart, and API interaction model.
+- Generated the ERD from the implemented SQLite schema in `src/storage/database.py`.
+- Exported FastAPI OpenAPI JSON from `src/services/event_api.py`.
+- Exported the viva scenario catalog from `src/evaluation/viva_scenarios.py`.
+- Added caption JSON/Markdown outputs and a manifest containing SERPS version, Git commit, generation timestamp, generating script, checksums, and documented limitations.
+- Mermaid SVG/PNG rendering is optional and depends on local Mermaid CLI availability. When `mmdc` is absent, the pipeline records the limitation and preserves editable sources rather than fabricating figures.
+- Private `Dissertation-Requirements.docx` and `Dissertation-Requirements.pdf` remain ignored and untracked.

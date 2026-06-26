@@ -1,0 +1,12 @@
+flowchart LR
+    Candidate["Candidate / Exam Environment"] --> Sensors["Sensor Layer"]
+    Sensors --> Detection["Detection Modules"]
+    Detection --> Events["Structured Evidence Events"]
+    Events --> CIE["Contextual Intelligence Engine"]
+    CIE --> Agent["Agentic Decision Support"]
+    Agent --> IPIME["Institutional Policy & Incident Management Engine"]
+    IPIME --> Reviewer["Human Reviewer"]
+    Reviewer --> Decision["Final Decision"]
+    CIE --> SQLite["SQLite Evidence Store"]
+    SQLite --> Dashboard["Streamlit Dashboard"]
+    API["FastAPI Structured Event API"] --> Events

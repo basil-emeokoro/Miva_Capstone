@@ -1,0 +1,131 @@
+{
+  "artefacts": [
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "61cc6fed84cb8c826a7f49d1934938b49ee9fa82744029bd1ae157950935a97e",
+      "path": "docs/dissertation/chapter3/uml/fig_3_1_high_level_architecture.mmd",
+      "source": "Frozen architecture definition and implemented modules.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "039c7d342672d3c4e768a174559ff2826893967b07e1a43d65329f516454d46c",
+      "path": "docs/dissertation/chapter3/uml/fig_3_2_layered_architecture.mmd",
+      "source": "Implemented package layout under src/ and app.py.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "83d904c205c41ff2e0867697fb5d1f1e707746c2dfdadd3087d89bea1d3faee6",
+      "path": "docs/dissertation/chapter3/uml/fig_3_3_system_workflow.mmd",
+      "source": "Implemented UI workflow and viva scenario validation pipeline.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "e6d42660bc627748ac6c05370ac5e4b5808653af9f81a9facaa5b404a2be8be2",
+      "path": "docs/dissertation/chapter3/uml/fig_3_4_use_case_diagram.mmd",
+      "source": "Implemented navigation modules and role simulator.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "aee541d3698af535e0e3500dd0af3649497199ab0772e51798f7697d5923b7cf",
+      "path": "docs/dissertation/chapter3/uml/fig_3_5_activity_diagram.mmd",
+      "source": "Session, CIE, IPIME, and review modules.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "d739acc035b9d00c9cd6e74367bf559087ad6cca02788507a5e942ac774522ad",
+      "path": "docs/dissertation/chapter3/uml/fig_3_6_sequence_diagram.mmd",
+      "source": "FastAPI service, Streamlit UI, CIE, policy, and storage modules.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "7e62e38db788247936fcb19519104416b7519519a48acf25a57c682a0fa71e36",
+      "path": "docs/dissertation/chapter3/uml/fig_3_7_entity_relationship_diagram.mmd",
+      "source": "src/storage/database.py SCHEMA constant.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "199ed4f7b179eefaf4b57467542a7552d36c9b396538a9a38e28d9215e3fbf5c",
+      "path": "docs/dissertation/chapter3/uml/fig_3_8_system_flowchart.mmd",
+      "source": "Frozen processing pipeline and implemented modules.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "mermaid",
+      "checksum_sha256": "6c566ec02082255fb1541deebaa0fb4a9789bc4316f1d391068a9560149e3279",
+      "path": "docs/dissertation/chapter3/uml/fig_3_9_api_interaction_model.mmd",
+      "source": "src/services/event_api.py FastAPI endpoints.",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "limitation",
+      "checksum_sha256": "c06f597bd0806cb45574cb6f41ca6357975f17e431060507ffd0a8a372a4d2dc",
+      "path": "docs/dissertation/chapter3/figures/DIAGRAM_EXPORT_LIMITATIONS.md",
+      "source": "Mermaid renderer availability",
+      "status": "documented"
+    },
+    {
+      "artefact_type": "json",
+      "checksum_sha256": "bc314ed81aed041559c7699e7fdd10031b82466f634d752f1fe018a3d39456e1",
+      "path": "docs/dissertation/chapter3/api/openapi.json",
+      "source": "FastAPI OpenAPI schema",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "json",
+      "checksum_sha256": "b8a36fcf0c80e2b2d8d14c16dfcf330b9c0478095d9720aacb2b3a775bf0749c",
+      "path": "docs/dissertation/chapter5/evaluation/viva_scenario_catalog.json",
+      "source": "Implemented viva scenario catalog",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "json",
+      "checksum_sha256": "4f69195409815b5407d1fe0b9938c7dec19929305b63292852892cfd67272813",
+      "path": "docs/dissertation/chapter3/architecture/serps_frozen_architecture_summary.json",
+      "source": "Frozen SERPS architecture",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "limitation",
+      "checksum_sha256": "d9916be458c921c6b6e5bdce98b8f01e910468046ca4140604f145fd43d6df6c",
+      "path": "docs/dissertation/chapter4/screenshots/SCREENSHOT_CAPTURE_LIMITATIONS.md",
+      "source": "Screenshot automation scaffold",
+      "status": "documented"
+    },
+    {
+      "artefact_type": "json",
+      "checksum_sha256": "b4bcc720b29327dc2906617179546359fb2fbc4e578e98ace88d2dd4fee2b80d",
+      "path": "docs/dissertation/captions/captions.json",
+      "source": "Caption generator",
+      "status": "generated"
+    },
+    {
+      "artefact_type": "markdown",
+      "checksum_sha256": "a03e2d118cf494f4fed24ee784dd8b19a289e0a758ad19ebdddff3808dd2899b",
+      "path": "docs/dissertation/captions/captions.md",
+      "source": "Caption generator",
+      "status": "generated"
+    }
+  ],
+  "generating_script": "scripts/docs/package_dissertation_assets.py",
+  "generation_timestamp": "2026-06-26T20:54:08+00:00",
+  "git_commit_hash": "6991d9b",
+  "limitations": [
+    "Mermaid CLI (mmdc) is not installed in this environment, so the foundation build generated editable .mmd sources only. Install Mermaid CLI to export SVG/PNG without changing the source diagrams."
+  ],
+  "mode": "dissertation",
+  "private_sources_excluded": [
+    "Dissertation-Requirements.docx",
+    "Dissertation-Requirements.pdf",
+    "System Specification.pdf",
+    "private dissertation drafts and writing guidance"
+  ],
+  "serps_version": "1.0",
+  "working_tree_dirty": true
+}

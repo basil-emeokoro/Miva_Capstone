@@ -1,0 +1,39 @@
+flowchart TB
+    subgraph UI["Presentation Layer"]
+        Streamlit["Streamlit Dashboard"]
+        TestPlayer["Prototype Test Player"]
+    end
+    subgraph API["Service Boundary"]
+        FastAPI["FastAPI Structured Event API"]
+    end
+    subgraph Detection["Detection Layer"]
+        Camera["Camera Stream Foundation"]
+        Vision["Visual Intelligence"]
+        Audio["Audio Intelligence"]
+        Identity["Identity Assurance"]
+        Behaviour["Behavioural Analytics"]
+    end
+    subgraph Reasoning["Contextual Intelligence Engine"]
+        Fusion["Event Fusion Module"]
+        Memory["Temporal Behaviour Memory"]
+        Scoring["Risk Scoring Engine"]
+        Context["Contextual Reasoning Module"]
+        Explain["Explainability Interface"]
+    end
+    subgraph Governance["Governance Layer"]
+        Agent["Agentic Decision Support"]
+        Policy["IPIME Policy-as-Code"]
+        Review["Human Review Workflow"]
+    end
+    subgraph Storage["Persistence Layer"]
+        DB["SQLite"]
+        Audit["Audit Trail"]
+        Evidence["Evidence Packages"]
+    end
+    UI --> API
+    API --> Detection
+    Detection --> Reasoning
+    Reasoning --> Governance
+    Governance --> Storage
+    Detection --> Storage
+    UI --> Storage

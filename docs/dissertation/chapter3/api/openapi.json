@@ -1,0 +1,502 @@
+{
+  "components": {
+    "schemas": {
+      "AudioFeaturePayload": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "detector_name": {
+            "default": "feature_audio_pipeline",
+            "title": "Detector Name",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "minimum": 0.0,
+            "title": "Duration Seconds",
+            "type": "number"
+          },
+          "noise_floor_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Floor Db"
+          },
+          "rms_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rms Db"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "silence_seconds": {
+            "default": 0.0,
+            "minimum": 0.0,
+            "title": "Silence Seconds",
+            "type": "number"
+          },
+          "speech_segments": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Speech Segments",
+            "type": "integer"
+          },
+          "voice_activity_ratio": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Voice Activity Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "candidate_id",
+          "duration_seconds"
+        ],
+        "title": "AudioFeaturePayload",
+        "type": "object"
+      },
+      "EvidenceEventPayload": {
+        "properties": {
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Id"
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "evidence_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Path"
+          },
+          "risk_weight": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Risk Weight",
+            "type": "number"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source_module": {
+            "title": "Source Module",
+            "type": "string"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "required": [
+          "session_id",
+          "candidate_id",
+          "source_module",
+          "event_type",
+          "risk_weight",
+          "confidence",
+          "description"
+        ],
+        "title": "EvidenceEventPayload",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IdentityConfidencePayload": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "detector_name": {
+            "default": "periodic_face_verifier",
+            "title": "Detector Name",
+            "type": "string"
+          },
+          "evidence_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Path"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "substitution_threshold": {
+            "default": 0.35,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Substitution Threshold",
+            "type": "number"
+          },
+          "threshold": {
+            "default": 0.65,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Threshold",
+            "type": "number"
+          },
+          "unknown_face": {
+            "default": false,
+            "title": "Unknown Face",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_id",
+          "candidate_id",
+          "confidence"
+        ],
+        "title": "IdentityConfidencePayload",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VisionFramePayload": {
+        "properties": {
+          "camera_id": {
+            "default": "primary",
+            "title": "Camera Id",
+            "type": "string"
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "evidence_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Path"
+          },
+          "image_base64": {
+            "title": "Image Base64",
+            "type": "string"
+          },
+          "run_object_detection": {
+            "default": false,
+            "title": "Run Object Detection",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "candidate_id",
+          "image_base64"
+        ],
+        "title": "VisionFramePayload",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "SERPS Structured Event API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/audio/analyse-features": {
+      "post": {
+        "operationId": "analyse_audio_audio_analyse_features_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioFeaturePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Analyse Audio Audio Analyse Features Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyse Audio"
+      }
+    },
+    "/events": {
+      "post": {
+        "operationId": "ingest_event_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceEventPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Ingest Event Events Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest Event"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/identity/analyse-confidence": {
+      "post": {
+        "operationId": "analyse_identity_identity_analyse_confidence_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityConfidencePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Analyse Identity Identity Analyse Confidence Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyse Identity"
+      }
+    },
+    "/vision/analyse-frame": {
+      "post": {
+        "operationId": "analyse_vision_frame_vision_analyse_frame_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisionFramePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Analyse Vision Frame Vision Analyse Frame Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyse Vision Frame"
+      }
+    }
+  }
+}

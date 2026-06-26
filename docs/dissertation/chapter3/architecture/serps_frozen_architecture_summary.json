@@ -1,0 +1,28 @@
+{
+  "architecture_status": "Version 1.0 frozen",
+  "contextual_intelligence_engine": [
+    "Event Fusion Module",
+    "Temporal Behaviour Memory",
+    "Risk Scoring Engine",
+    "Contextual Reasoning Module",
+    "Explainability Interface"
+  ],
+  "governance_rules": [
+    "Detection modules emit structured evidence only.",
+    "CIE is the sole reasoning engine.",
+    "Agentic Decision Support recommends actions only.",
+    "IPIME determines institution-specific workflow only.",
+    "Human reviewers make final decisions."
+  ],
+  "pipeline": [
+    "Sensor Layer",
+    "Detection Modules",
+    "Structured Evidence Generation",
+    "Contextual Intelligence Engine",
+    "Agentic Decision Support",
+    "Institutional Policy & Incident Management Engine",
+    "Human Reviewer",
+    "Final Decision"
+  ],
+  "serps_version": "1.0"
+}

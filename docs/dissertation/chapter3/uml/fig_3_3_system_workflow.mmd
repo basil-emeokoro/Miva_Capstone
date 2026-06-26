@@ -1,0 +1,17 @@
+flowchart TD
+    Start([Start]) --> Enrol["Register candidate and consent"]
+    Enrol --> Face["Guided facial enrolment"]
+    Face --> PreExam["Pre-exam device and environment checks"]
+    PreExam --> Auth["Candidate authentication"]
+    Auth --> Session["Start monitored session"]
+    Session --> Evidence["Generate structured evidence"]
+    Evidence --> CIE["CIE contextual reasoning"]
+    CIE --> Agent["Agent recommends action"]
+    Agent --> Policy["IPIME evaluates institutional policy"]
+    Policy --> Ack{"Candidate acknowledgement required?"}
+    Ack -- Yes --> CandidateAck["Candidate explains and acknowledges incident"]
+    Ack -- No --> Review["Human reviewer reviews evidence"]
+    CandidateAck --> Review
+    Review --> Outcome["Final authorised outcome"]
+    Outcome --> Report["Audit and reports"]
+    Report --> End([End])

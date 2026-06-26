@@ -1,0 +1,26 @@
+flowchart LR
+    Candidate((Candidate))
+    Reviewer((Reviewer / Proctor))
+    Admin((Administrator))
+    SysAdmin((System Administrator))
+    Enrol["Register and Consent"]
+    Capture["Complete Face Capture"]
+    Authenticate["Authenticate for Exam"]
+    TakeExam["Take Prototype Assessment"]
+    Monitor["Monitor Session"]
+    Review["Review Contextual Alerts"]
+    Policy["Manage Institutional Policies"]
+    Reports["Generate Reports"]
+    API["Maintain API / Services"]
+    Candidate --> Enrol
+    Candidate --> Capture
+    Candidate --> Authenticate
+    Candidate --> TakeExam
+    Reviewer --> Monitor
+    Reviewer --> Review
+    Reviewer --> Reports
+    Admin --> Enrol
+    Admin --> Policy
+    Admin --> Reports
+    SysAdmin --> API
+    SysAdmin --> Policy

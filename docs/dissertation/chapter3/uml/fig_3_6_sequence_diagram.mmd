@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant Candidate
+    participant UI as SERPS UI
+    participant API as FastAPI Backend
+    participant CIE as Contextual Intelligence Engine
+    participant Agent as Agentic Decision Support
+    participant IPIME
+    participant DB as SQLite
+    participant Reviewer
+    Candidate->>UI: Complete enrolment and authentication
+    UI->>DB: Store candidate, consent, checks, session
+    API->>DB: Persist structured EvidenceEvent
+    API->>CIE: Submit evidence for contextual reasoning
+    CIE->>DB: Store contextual/fused alert
+    CIE->>Agent: Provide risk and explanation
+    Agent->>IPIME: Send recommended intervention
+    IPIME->>DB: Store policy decision
+    IPIME-->>UI: Candidate acknowledgement workflow if required
+    Candidate->>UI: Submit explanation and acknowledgement
+    UI->>DB: Store acknowledgement
+    Reviewer->>UI: Review alert, evidence, policy decision
+    UI->>DB: Store reviewer decision and audit trail

@@ -1,0 +1,196 @@
+erDiagram
+    candidates {
+        TEXT candidate_id PK
+        TEXT full_name
+        TEXT exam_code
+        TEXT institution
+        TEXT email
+        TEXT institution_type
+        TEXT waec_registration_number
+        TEXT centre_number
+        TEXT candidate_number
+        TEXT matric_number
+        TEXT gender
+        TEXT date_of_birth
+        TEXT country
+        TEXT state
+        TEXT local_government_area
+        TEXT postal_code
+        TEXT street_address
+        TEXT enrolment_status
+        TEXT created_at
+    }
+    consent {
+        TEXT consent_id PK
+        TEXT candidate_id
+        TEXT consent_text_version
+        TEXT consent_status
+        TEXT consent_timestamp
+    }
+    face_enrolment {
+        TEXT face_record_id PK
+        TEXT candidate_id
+        TEXT capture_direction
+        TEXT image_path
+        TEXT embedding_path
+        REAL quality_score
+        TEXT captured_at
+    }
+    candidate_custom_fields {
+        TEXT field_id PK
+        TEXT candidate_id
+        TEXT field_name
+        TEXT field_value
+        TEXT created_at
+    }
+    voice_enrolment {
+        TEXT voice_record_id PK
+        TEXT candidate_id
+        TEXT phrase_used
+        TEXT audio_path
+        REAL quality_score
+        TEXT captured_at
+    }
+    sessions {
+        TEXT session_id PK
+        TEXT candidate_id
+        TEXT exam_code
+        TEXT monitoring_mode
+        TEXT start_time
+        TEXT end_time
+        TEXT authentication_status
+        TEXT session_status
+    }
+    device_checks {
+        TEXT check_id PK
+        TEXT candidate_id
+        TEXT monitoring_mode
+        TEXT primary_camera_status
+        TEXT secondary_camera_status
+        TEXT microphone_status
+        TEXT lighting_status
+        TEXT candidate_presence_status
+        TEXT environment_declaration_status
+        TEXT mirror_status
+        TEXT overall_status
+        INTEGER staff_override
+        TEXT override_reason
+        TEXT checked_by
+        TEXT checked_at
+        TEXT details
+    }
+    events {
+        TEXT event_id PK
+        TEXT session_id
+        TEXT candidate_id
+        TEXT timestamp
+        TEXT source_module
+        TEXT event_type
+        REAL risk_weight
+        REAL confidence
+        TEXT camera_id
+        TEXT evidence_path
+        TEXT description
+    }
+    fused_alerts {
+        TEXT alert_id PK
+        TEXT session_id
+        TEXT candidate_id
+        TEXT start_time
+        TEXT end_time
+        INTEGER risk_score
+        TEXT risk_level
+        TEXT alert_type
+        TEXT contributing_events
+        TEXT explanation
+        TEXT recommended_action
+        REAL confidence
+        INTEGER current_risk_score
+        INTEGER rolling_risk_score
+        TEXT risk_trend
+        TEXT contributing_modules
+        TEXT reasoning_trace
+        TEXT review_status
+    }
+    reviewer_decisions {
+        TEXT review_id PK
+        TEXT alert_id
+        TEXT reviewer_id
+        TEXT decision
+        TEXT reviewer_comment
+        TEXT reviewed_at
+    }
+    policy_decisions {
+        TEXT decision_id PK
+        TEXT policy_id
+        TEXT institution_profile
+        TEXT alert_id
+        TEXT session_id
+        TEXT candidate_id
+        TEXT risk_level
+        TEXT agent_priority
+        TEXT agent_actions
+        TEXT recommended_actions
+        INTEGER pause_assessment
+        INTEGER require_acknowledgement
+        TEXT notify_role
+        INTEGER preserve_evidence
+        TEXT candidate_message
+        TEXT workflow_label
+        TEXT status
+        TEXT created_at
+    }
+    incident_acknowledgements {
+        TEXT acknowledgement_id PK
+        TEXT decision_id
+        TEXT candidate_id
+        TEXT candidate_explanation
+        INTEGER acknowledged
+        TEXT acknowledged_at
+    }
+    reviewer_incident_decisions {
+        TEXT incident_review_id PK
+        TEXT decision_id
+        TEXT reviewer_id
+        TEXT reviewer_action
+        TEXT rationale
+        TEXT reviewed_at
+    }
+    viva_scenario_runs {
+        TEXT run_id PK
+        TEXT scenario_id
+        TEXT scenario_name
+        TEXT session_id
+        TEXT candidate_id
+        TEXT alert_id
+        TEXT policy_decision_id
+        TEXT expected_risk_level
+        TEXT actual_risk_level
+        TEXT expected_policy_response
+        TEXT actual_policy_response
+        TEXT agent_recommendation
+        INTEGER acknowledgement_required
+        INTEGER acknowledgement_recorded
+        INTEGER reviewer_decision_recorded
+        TEXT final_outcome_status
+        TEXT pass_status
+        TEXT notes
+        TEXT created_at
+    }
+    audit_logs {
+        TEXT audit_id PK
+        TEXT actor
+        TEXT action
+        TEXT target
+        TEXT timestamp
+        TEXT details
+    }
+    candidates ||--o{ candidate_custom_fields : candidate_id
+    candidates ||--o{ consent : candidate_id
+    candidates ||--o{ device_checks : candidate_id
+    candidates ||--o{ face_enrolment : candidate_id
+    candidates ||--o{ sessions : candidate_id
+    candidates ||--o{ voice_enrolment : candidate_id
+    fused_alerts ||--o{ reviewer_decisions : alert_id
+    policy_decisions ||--o{ incident_acknowledgements : decision_id
+    policy_decisions ||--o{ reviewer_incident_decisions : decision_id

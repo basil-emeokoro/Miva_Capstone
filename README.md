@@ -75,6 +75,7 @@ pip install ultralytics mediapipe
 - Streamlit `st.camera_input` is not ideal for continuous AI-guided face movement detection and automatic pose capture. Production-grade capture should use `streamlit-webrtc`, a FastAPI/WebSocket + OpenCV video stream, or a dedicated React/WebRTC frontend so face landmarks can be inspected continuously and valid left/right/up/down/centre poses can be auto-captured.
 - Face recognition is implemented for enrolment/authentication, while advanced voice verification and object detection remain represented through prototype event flows.
 - OpenCV still-frame analysis is active for user-uploaded evidence. MediaPipe and YOLO are optional local adapters at this milestone; if unavailable, SERPS continues to use structured prototype hooks rather than failing at startup.
+- Documentation SVG/PNG export depends on Mermaid CLI (`mmdc`). If it is not installed, the documentation pipeline generates editable Mermaid sources and records the export limitation rather than fabricating rendered images.
 - Prototype duplicate-face detection compares new face embeddings against saved enrolment templates, but it is not a production biometric de-duplication service.
 - The mock assessment is not a full exam engine.
 - RBAC is local prototype authorization only.
@@ -163,6 +164,27 @@ Addenda 3 and 4 elevate the previous Event Fusion Engine into a broader Contextu
 - Reports include a Viva Scenario Validation Summary table with expected risk, actual risk, expected policy response, actual policy response, pass/needs-review status, acknowledgement state, reviewer state, and final outcome status.
 - These scenarios are controlled validation cases for demonstration and dissertation evaluation. They are not production cheating labels and do not replace authorised human review.
 
+## Documentation Automation Framework
+
+SERPS now includes a foundation for automated dissertation artefact generation. The implementation remains the source of truth for generated figures, API evidence, scenario catalogs, captions, and manifests.
+
+Run the documentation build with:
+
+```powershell
+python scripts/docs/package_dissertation_assets.py
+```
+
+The current pipeline generates:
+
+- Chapter Three editable Mermaid diagrams for high-level architecture, layered architecture, workflow, use case, activity, sequence, ERD, system flowchart, and API interaction model.
+- An ER diagram generated from `src/storage/database.py`.
+- FastAPI `openapi.json` generated from `src/services/event_api.py`.
+- Chapter Five viva scenario catalog generated from `src/evaluation/viva_scenarios.py`.
+- Separate captions in JSON and Markdown.
+- A version-aware manifest with Git commit, timestamp, script name, artefact paths, and SHA-256 checksums.
+
+Generated implementation artefacts are stored under `docs/dissertation/`. Private requirement files and dissertation-writing drafts remain untracked.
+
 ## Monitoring Roadmap
 
 The Monitoring module is still a controlled prototype. Future implementation should support single-candidate view, grouped candidate/session view, multi-session analytics, visual dashboards, flagged-candidate classification, event distribution, risk-level summaries, reviewer/proctor queues, and Agentic AI prioritisation of infringements.
@@ -171,3 +193,5 @@ The Monitoring module is still a controlled prototype. Future implementation sho
 
 - `docs/development_log.md` records implementation progress and limitations.
 - `docs/system_architecture.md` summarizes the prototype architecture.
+- `docs/dissertation/` contains generated implementation-derived dissertation artefacts, captions, and manifests.
+- `scripts/docs/` contains the documentation automation framework.

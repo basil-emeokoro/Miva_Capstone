@@ -1,0 +1,13 @@
+flowchart LR
+    External["External detector / secure exam player"] --> EventsAPI["POST /events"]
+    External --> VisionAPI["POST /vision/analyse-frame"]
+    External --> AudioAPI["POST /audio/analyse-features"]
+    External --> IdentityAPI["POST /identity/analyse-confidence"]
+    EventsAPI --> Store["SQLite EvidenceEvent"]
+    VisionAPI --> Store
+    AudioAPI --> Store
+    IdentityAPI --> Store
+    Store --> CIE["Contextual Intelligence Engine"]
+    CIE --> Alerts["Contextual alerts"]
+    Alerts --> Dashboard["Streamlit dashboard"]
+    Alerts --> Review["Human review"]

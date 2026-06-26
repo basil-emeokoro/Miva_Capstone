@@ -1,0 +1,13 @@
+flowchart TD
+    Input[/Sensor and user inputs/] --> Detect[Detection modules]
+    Detect --> Structured[Create immutable EvidenceEvent]
+    Structured --> Store[(SQLite events)]
+    Store --> Window[Select temporal window]
+    Window --> Fusion[Event Fusion Module]
+    Fusion --> Memory[Temporal Behaviour Memory]
+    Memory --> Score[Risk Scoring Engine]
+    Score --> Explain[Explainability Interface]
+    Explain --> Agent[Agentic Decision Support]
+    Agent --> Policy[IPIME policy workflow]
+    Policy --> Human[Human reviewer]
+    Human --> Final[/Final decision and report/]

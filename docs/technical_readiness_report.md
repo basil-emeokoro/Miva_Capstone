@@ -6,7 +6,7 @@ Baseline implementation commit verified before this report: `7351d34 evaluation:
 ## Verification Snapshot
 
 - `python -m py_compile app.py`: passed.
-- `python -m pytest -q`: passed, `62 passed` after final polish report-export coverage was added.
+- `python -m pytest -q`: passed, `64 passed` after documentation automation coverage was added.
 - Streamlit startup smoke test: HTTP `200` on local probe.
 - Startup warnings/tracebacks: no deprecated `use_container_width` warning observed; no Windows `WinError 10054` traceback observed in captured startup log.
 - Camera on page load: no camera activation path is invoked at startup. Camera/image analysis remains user-triggered.
@@ -158,6 +158,20 @@ Structured Evidence Events
 The Monitoring page exposes 10 realistic validation scenarios, including normal behaviour, isolated looking away, repeated gaze deviation, mobile-phone evidence, background speech, multiple persons, repeated face absence, identity mismatch, suspicious camera disconnection, and a critical combined multimodal case. Each scenario records expected risk, actual risk, expected policy response, actual policy response, acknowledgement state, reviewer-decision state, pass/needs-review status, and final outcome status in SQLite. Reports include a Viva Scenario Validation Summary table for evaluation evidence.
 
 These scenarios are controlled validation cases only. They are not production cheating labels and do not make final examination decisions.
+
+## Documentation Automation Framework Addendum
+
+SERPS now includes a Documentation Automation Framework foundation. It supports a single rebuild command:
+
+```powershell
+python scripts/docs/package_dissertation_assets.py
+```
+
+Current generated artefacts include editable Mermaid diagrams for Chapter Three architecture figures, a SQLite-derived ERD, FastAPI OpenAPI JSON, a Chapter Five viva scenario catalog, separate captions, and a manifest with checksums and version metadata.
+
+Status: **Partially Implemented**. The framework is ready for controlled dissertation artefact generation, but screenshot capture, test-report export, rendered SVG/PNG diagram export, and evaluation chart generation still need strengthening. Mermaid rendering depends on local Mermaid CLI (`mmdc`); the current environment records this limitation and preserves editable sources.
+
+Recommended next documentation action: add automated screenshot capture through a controlled browser runner and add evaluation chart generation from stored viva scenario outputs.
 
 ## Remaining Critical Gaps Before Viva
 

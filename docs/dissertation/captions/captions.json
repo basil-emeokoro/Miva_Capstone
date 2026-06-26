@@ -1,0 +1,76 @@
+{
+  "captions": [
+    {
+      "caption": "High-level architecture of SERPS showing the frozen governance pipeline from sensors through human review.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_1_high_level_architecture.mmd",
+      "figure": "Figure 3.1",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "High-Level Architecture of SERPS"
+    },
+    {
+      "caption": "Detailed layered architecture of SERPS, separating user interface, service boundary, detection, CIE reasoning, governance, and persistence.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_2_layered_architecture.mmd",
+      "figure": "Figure 3.2",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "Detailed Layered Architecture"
+    },
+    {
+      "caption": "End-to-end workflow of candidate enrolment, session gating, evidence generation, contextual reasoning, policy response, human review, and reporting.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_3_system_workflow.mmd",
+      "figure": "Figure 3.3",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "System Workflow"
+    },
+    {
+      "caption": "Use case view of SERPS actors and major capabilities supported by the prototype.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_4_use_case_diagram.mmd",
+      "figure": "Figure 3.4",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "Use Case Diagram"
+    },
+    {
+      "caption": "Activity diagram covering the complete examination governance lifecycle implemented in SERPS.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_5_activity_diagram.mmd",
+      "figure": "Figure 3.5",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "Activity Diagram"
+    },
+    {
+      "caption": "Sequence of interactions between the candidate, SERPS UI, FastAPI backend, CIE, agentic decision support, IPIME, database, and reviewer.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_6_sequence_diagram.mmd",
+      "figure": "Figure 3.6",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "Sequence Diagram"
+    },
+    {
+      "caption": "Entity relationship diagram generated from the implemented SQLite schema.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_7_entity_relationship_diagram.mmd",
+      "figure": "Figure 3.7",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "Entity Relationship Diagram"
+    },
+    {
+      "caption": "System flowchart of the SERPS evidence processing and governance pathway.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_8_system_flowchart.mmd",
+      "figure": "Figure 3.8",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "System Flowchart"
+    },
+    {
+      "caption": "API interaction model derived from the implemented FastAPI structured-event service boundary.",
+      "chapter": "Chapter 3",
+      "editable_source": "docs/dissertation/chapter3/uml/fig_3_9_api_interaction_model.mmd",
+      "figure": "Figure 3.9",
+      "source": "Author's implementation-derived architecture, SERPS v1.0.",
+      "title": "API Interaction Model"
+    }
+  ]
+}

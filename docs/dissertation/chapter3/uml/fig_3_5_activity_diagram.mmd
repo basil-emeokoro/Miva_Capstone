@@ -1,0 +1,22 @@
+flowchart TD
+    A([Candidate arrives]) --> B["Verify candidate profile"]
+    B --> C{"Biodata and consent saved?"}
+    C -- No --> D["Complete registration"]
+    C -- Yes --> E["Run pre-exam checks"]
+    D --> E
+    E --> F{"Checks pass or staff override?"}
+    F -- No --> E
+    F -- Yes --> G["Authenticate candidate"]
+    G --> H{"Authentication pass or override?"}
+    H -- No --> G
+    H -- Yes --> I["Start session"]
+    I --> J["Detection modules emit EvidenceEvent rows"]
+    J --> K["CIE evaluates temporal context"]
+    K --> L["Agent recommends action"]
+    L --> M["IPIME applies institution policy"]
+    M --> N{"Incident acknowledgement required?"}
+    N -- Yes --> O["Candidate acknowledgement workflow"]
+    N -- No --> P["Reviewer queue"]
+    O --> P
+    P --> Q["Reviewer records action and rationale"]
+    Q --> R([Final outcome recorded])
