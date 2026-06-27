@@ -173,6 +173,17 @@ Status: **Partially Implemented**. The framework is ready for controlled dissert
 
 Recommended next documentation action: add automated screenshot capture through a controlled browser runner and add evaluation chart generation from stored viva scenario outputs.
 
+## Milestone Version Tags
+
+SERPS now uses annotated Git milestone tags as reproducible research checkpoints:
+
+| Tag | Commit | Meaning |
+| --- | --- | --- |
+| `v1.0.0-feature-complete` | `6991d9b` | Feature-complete SERPS Version 1.0 baseline before documentation automation. |
+| `v1.1.0-documentation-framework` | `b50e41a` | Documentation Automation Framework foundation and generated artefact baseline. |
+
+These tags make it possible to regenerate dissertation artefacts from known implementation states and to demonstrate exactly which version was used during viva preparation.
+
 ## Remaining Critical Gaps Before Viva
 
 1. Continuous camera/audio monitoring is not yet live; current live AI is user-triggered through uploaded frames and feature windows.

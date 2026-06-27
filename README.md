@@ -185,6 +185,15 @@ The current pipeline generates:
 
 Generated implementation artefacts are stored under `docs/dissertation/`. Private requirement files and dissertation-writing drafts remain untracked.
 
+## Milestone Tags
+
+SERPS uses annotated Git milestone tags to support dissertation traceability, viva demonstration, and reproducible research.
+
+- `v1.0.0-feature-complete`: Feature-complete SERPS Version 1.0 implementation before documentation automation. This marks the stable governance platform baseline.
+- `v1.1.0-documentation-framework`: Documentation Automation Framework foundation. This marks the point where SERPS begins generating dissertation artefacts directly from the implementation.
+
+Future milestone tags such as `v1.2.0-dissertation-mode` and `v1.3.0-release-candidate` should only be created when those milestones are completed.
+
 ## Monitoring Roadmap
 
 The Monitoring module is still a controlled prototype. Future implementation should support single-candidate view, grouped candidate/session view, multi-session analytics, visual dashboards, flagged-candidate classification, event distribution, risk-level summaries, reviewer/proctor queues, and Agentic AI prioritisation of infringements.

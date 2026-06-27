@@ -213,3 +213,10 @@
 - Added caption JSON/Markdown outputs and a manifest containing SERPS version, Git commit, generation timestamp, generating script, checksums, and documented limitations.
 - Mermaid SVG/PNG rendering is optional and depends on local Mermaid CLI availability. When `mmdc` is absent, the pipeline records the limitation and preserves editable sources rather than fabricating figures.
 - Private `Dissertation-Requirements.docx` and `Dissertation-Requirements.pdf` remain ignored and untracked.
+
+## Milestone Tagging
+
+- Introduced annotated Git milestone tags for traceable dissertation and viva baselines.
+- `v1.0.0-feature-complete` marks the feature-complete SERPS implementation before documentation automation.
+- `v1.1.0-documentation-framework` marks the Documentation Automation Framework foundation commit.
+- Milestone tags are used to identify reproducible implementation states for dissertation figures, Chapter 4/5 evidence, viva rehearsals, and future release packaging.
