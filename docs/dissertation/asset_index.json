@@ -1,0 +1,227 @@
+{
+  "artefact_count": 23,
+  "chapters": {
+    "Chapter 3": [
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "bc314ed81aed041559c7699e7fdd10031b82466f634d752f1fe018a3d39456e1",
+        "description": "Full OpenAPI schema",
+        "path": "docs/dissertation/chapter3/api/openapi.json",
+        "source": "FastAPI OpenAPI schema",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "2520a98539db137dc9148c1f27387dc239b84cfd46a2cf5e6d518586af81d7f6",
+        "description": "OpenAPI endpoint summary",
+        "path": "docs/dissertation/chapter3/api/openapi_summary.json",
+        "source": "FastAPI OpenAPI schema",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "4f69195409815b5407d1fe0b9938c7dec19929305b63292852892cfd67272813",
+        "description": "Frozen architecture summary",
+        "path": "docs/dissertation/chapter3/architecture/serps_frozen_architecture_summary.json",
+        "source": "Frozen SERPS architecture",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "limitation",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "c06f597bd0806cb45574cb6f41ca6357975f17e431060507ffd0a8a372a4d2dc",
+        "description": "Diagram rendering limitation note",
+        "path": "docs/dissertation/chapter3/figures/DIAGRAM_EXPORT_LIMITATIONS.md",
+        "source": "Mermaid renderer availability",
+        "status": "documented"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "61cc6fed84cb8c826a7f49d1934938b49ee9fa82744029bd1ae157950935a97e",
+        "description": "High-Level Architecture of SERPS",
+        "figure": "Figure 3.1",
+        "path": "docs/dissertation/chapter3/uml/fig_3_1_high_level_architecture.mmd",
+        "source": "Frozen architecture definition and implemented modules.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "039c7d342672d3c4e768a174559ff2826893967b07e1a43d65329f516454d46c",
+        "description": "Detailed Layered Architecture",
+        "figure": "Figure 3.2",
+        "path": "docs/dissertation/chapter3/uml/fig_3_2_layered_architecture.mmd",
+        "source": "Implemented package layout under src/ and app.py.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "83d904c205c41ff2e0867697fb5d1f1e707746c2dfdadd3087d89bea1d3faee6",
+        "description": "System Workflow",
+        "figure": "Figure 3.3",
+        "path": "docs/dissertation/chapter3/uml/fig_3_3_system_workflow.mmd",
+        "source": "Implemented UI workflow and viva scenario validation pipeline.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "e6d42660bc627748ac6c05370ac5e4b5808653af9f81a9facaa5b404a2be8be2",
+        "description": "Use Case Diagram",
+        "figure": "Figure 3.4",
+        "path": "docs/dissertation/chapter3/uml/fig_3_4_use_case_diagram.mmd",
+        "source": "Implemented navigation modules and role simulator.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "aee541d3698af535e0e3500dd0af3649497199ab0772e51798f7697d5923b7cf",
+        "description": "Activity Diagram",
+        "figure": "Figure 3.5",
+        "path": "docs/dissertation/chapter3/uml/fig_3_5_activity_diagram.mmd",
+        "source": "Session, CIE, IPIME, and review modules.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "d739acc035b9d00c9cd6e74367bf559087ad6cca02788507a5e942ac774522ad",
+        "description": "Sequence Diagram",
+        "figure": "Figure 3.6",
+        "path": "docs/dissertation/chapter3/uml/fig_3_6_sequence_diagram.mmd",
+        "source": "FastAPI service, Streamlit UI, CIE, policy, and storage modules.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "7e62e38db788247936fcb19519104416b7519519a48acf25a57c682a0fa71e36",
+        "description": "Entity Relationship Diagram",
+        "figure": "Figure 3.7",
+        "path": "docs/dissertation/chapter3/uml/fig_3_7_entity_relationship_diagram.mmd",
+        "source": "src/storage/database.py SCHEMA constant.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "199ed4f7b179eefaf4b57467542a7552d36c9b396538a9a38e28d9215e3fbf5c",
+        "description": "System Flowchart",
+        "figure": "Figure 3.8",
+        "path": "docs/dissertation/chapter3/uml/fig_3_8_system_flowchart.mmd",
+        "source": "Frozen processing pipeline and implemented modules.",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "mermaid",
+        "chapter": "Chapter 3",
+        "checksum_sha256": "6c566ec02082255fb1541deebaa0fb4a9789bc4316f1d391068a9560149e3279",
+        "description": "API Interaction Model",
+        "figure": "Figure 3.9",
+        "path": "docs/dissertation/chapter3/uml/fig_3_9_api_interaction_model.mmd",
+        "source": "src/services/event_api.py FastAPI endpoints.",
+        "status": "generated"
+      }
+    ],
+    "Chapter 4": [
+      {
+        "artefact_type": "limitation",
+        "chapter": "Chapter 4",
+        "checksum_sha256": "359620a585c7f11ee7f0cfdd99779a1396fe10efc08af72c64421a3590fbaf4e",
+        "description": "Screenshot capture limitation note",
+        "path": "docs/dissertation/chapter4/screenshots/SCREENSHOT_CAPTURE_LIMITATIONS.md",
+        "source": "Screenshot automation scaffold",
+        "status": "documented"
+      },
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 4",
+        "checksum_sha256": "17713909ab97779e58abead9b047ddda38afb6f4c3ee43601eab4ad36d01b276",
+        "description": "Planned screenshot capture manifest",
+        "path": "docs/dissertation/chapter4/screenshots/screenshot_plan.json",
+        "source": "Screenshot automation framework",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 4",
+        "checksum_sha256": "af19d06bfe7e189399713c62ca91df7243fbb68a5c8aaeed84cae30c1b73a1d6",
+        "description": "Planned test evidence outputs",
+        "path": "docs/dissertation/chapter4/testing/test_evidence_plan.json",
+        "source": "Testing evidence framework",
+        "status": "generated"
+      }
+    ],
+    "Chapter 5": [
+      {
+        "artefact_type": "svg",
+        "chapter": "Chapter 5",
+        "checksum_sha256": "c6aaf65a2c14f9d92e2824b34b5a532c25af5babdc73fd5a4b994d75ccec05ec",
+        "description": "Risk distribution chart",
+        "path": "docs/dissertation/chapter5/charts/risk_distribution.svg",
+        "source": "Implemented viva scenario catalog",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 5",
+        "checksum_sha256": "b8a36fcf0c80e2b2d8d14c16dfcf330b9c0478095d9720aacb2b3a775bf0749c",
+        "description": "Controlled viva scenario catalog",
+        "path": "docs/dissertation/chapter5/evaluation/viva_scenario_catalog.json",
+        "source": "Implemented viva scenario catalog",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "json",
+        "chapter": "Chapter 5",
+        "checksum_sha256": "5497fe57b2c8717b1a5ddb851c5d81f9e980b6bb586783baf7ca238521719d8f",
+        "description": "Evaluation scenario summary",
+        "path": "docs/dissertation/chapter5/evaluation/viva_scenario_summary.json",
+        "source": "Implemented viva scenario catalog",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "csv",
+        "chapter": "Chapter 5",
+        "checksum_sha256": "fc1a177a46d5a67fe9451c6ff55a39922d8e5aa0e5072acca9526c68f11c2ae4",
+        "description": "Policy response distribution source data",
+        "path": "docs/dissertation/chapter5/metrics/policy_response_distribution.csv",
+        "source": "Implemented viva scenario catalog",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "csv",
+        "chapter": "Chapter 5",
+        "checksum_sha256": "3ac7c9f0030c66c8abbe66de57274c542ed7fc54b3f1df0203a7860f2617febb",
+        "description": "Risk distribution source data",
+        "path": "docs/dissertation/chapter5/metrics/risk_distribution.csv",
+        "source": "Implemented viva scenario catalog",
+        "status": "generated"
+      }
+    ],
+    "General": [
+      {
+        "artefact_type": "json",
+        "checksum_sha256": "b4bcc720b29327dc2906617179546359fb2fbc4e578e98ace88d2dd4fee2b80d",
+        "description": "Machine-readable figure captions",
+        "path": "docs/dissertation/captions/captions.json",
+        "source": "Caption generator",
+        "status": "generated"
+      },
+      {
+        "artefact_type": "markdown",
+        "checksum_sha256": "a03e2d118cf494f4fed24ee784dd8b19a289e0a758ad19ebdddff3808dd2899b",
+        "description": "Dissertation-ready figure captions",
+        "path": "docs/dissertation/captions/captions.md",
+        "source": "Caption generator",
+        "status": "generated"
+      }
+    ]
+  }
+}

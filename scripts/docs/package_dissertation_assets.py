@@ -4,10 +4,13 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
+import zipfile
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,13 +44,24 @@ def build_dissertation_assets(
     paths = _ensure_directories(output_root)
     artefacts: list[dict[str, Any]] = []
     limitations: list[str] = []
+    generation_timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
     diagrams = _diagram_definitions(project_root)
     captions = []
     for diagram in diagrams:
         source_path = paths["uml"] / f"{_figure_token(diagram.figure)}_{diagram.slug}.mmd"
         _write_text(source_path, diagram.mermaid)
-        artefacts.append(_manifest_entry(source_path, "mermaid", diagram.source, "generated"))
+        artefacts.append(
+            _manifest_entry(
+                source_path,
+                "mermaid",
+                diagram.source,
+                "generated",
+                chapter=diagram.chapter,
+                figure=diagram.figure,
+                description=diagram.title,
+            )
+        )
         captions.append(
             {
                 "figure": diagram.figure,
@@ -64,11 +78,29 @@ def build_dissertation_assets(
         limitations.append(render_note)
         limitation_path = paths["figures"] / "DIAGRAM_EXPORT_LIMITATIONS.md"
         _write_text(limitation_path, f"# Diagram Export Limitation\n\n{render_note}\n")
-        artefacts.append(_manifest_entry(limitation_path, "limitation", "Mermaid renderer availability", "documented"))
+        artefacts.append(
+            _manifest_entry(
+                limitation_path,
+                "limitation",
+                "Mermaid renderer availability",
+                "documented",
+                chapter="Chapter 3",
+                description="Diagram rendering limitation note",
+            )
+        )
     else:
         for rendered in sorted(paths["figures"].glob("*.*")):
             if rendered.suffix.lower() in {".svg", ".png"}:
-                artefacts.append(_manifest_entry(rendered, rendered.suffix.lower().lstrip("."), "Mermaid CLI render", "generated"))
+                artefacts.append(
+                    _manifest_entry(
+                        rendered,
+                        rendered.suffix.lower().lstrip("."),
+                        "Mermaid CLI render",
+                        "generated",
+                        chapter="Chapter 3",
+                        description="Rendered architecture diagram",
+                    )
+                )
 
     openapi_result = _export_openapi(paths["api"], project_root)
     artefacts.extend(openapi_result["artefacts"])
@@ -80,33 +112,48 @@ def build_dissertation_assets(
 
     architecture_path = paths["chapter3_arch"] / "serps_frozen_architecture_summary.json"
     _write_json(architecture_path, _architecture_summary())
-    artefacts.append(_manifest_entry(architecture_path, "json", "Frozen SERPS architecture", "generated"))
-
-    screenshot_note = paths["screenshots"] / "SCREENSHOT_CAPTURE_LIMITATIONS.md"
-    _write_text(
-        screenshot_note,
-        "# Screenshot Capture Limitation\n\n"
-        "Automated screenshot capture is scaffolded for Dissertation Mode but is not executed by this foundation build. "
-        "Future builds should drive the Streamlit UI through Playwright or an equivalent browser runner after the app "
-        "is started in a controlled demonstration mode. No screenshots are fabricated by this pipeline.\n",
+    artefacts.append(
+        _manifest_entry(
+            architecture_path,
+            "json",
+            "Frozen SERPS architecture",
+            "generated",
+            chapter="Chapter 3",
+            description="Frozen architecture summary",
+        )
     )
-    artefacts.append(_manifest_entry(screenshot_note, "limitation", "Screenshot automation scaffold", "documented"))
+
+    screenshot_result = _write_screenshot_framework(paths["screenshots"])
+    artefacts.extend(screenshot_result["artefacts"])
+    limitations.extend(screenshot_result["limitations"])
+
+    test_evidence_result = _write_test_evidence_framework(paths["testing"])
+    artefacts.extend(test_evidence_result["artefacts"])
+
+    evaluation_result = _write_evaluation_assets(paths["chapter5_eval"], paths["metrics"], paths["charts"], project_root)
+    artefacts.extend(evaluation_result["artefacts"])
+    limitations.extend(evaluation_result["limitations"])
 
     captions_path = paths["captions"] / "captions.json"
     _write_json(captions_path, {"captions": captions})
-    artefacts.append(_manifest_entry(captions_path, "json", "Caption generator", "generated"))
+    artefacts.append(_manifest_entry(captions_path, "json", "Caption generator", "generated", description="Machine-readable figure captions"))
 
     captions_md_path = paths["captions"] / "captions.md"
     _write_text(captions_md_path, _captions_markdown(captions))
-    artefacts.append(_manifest_entry(captions_md_path, "markdown", "Caption generator", "generated"))
+    artefacts.append(_manifest_entry(captions_md_path, "markdown", "Caption generator", "generated", description="Dissertation-ready figure captions"))
+
+    asset_index_path = output_root / "asset_index.json"
+    _write_json(asset_index_path, _asset_index(artefacts))
+    artefacts.append(_manifest_entry(asset_index_path, "json", "Documentation asset index", "generated", description="Grouped dissertation artefact index"))
 
     manifest = {
         "serps_version": SERPS_VERSION,
         "mode": mode,
         "git_commit_hash": _git_commit(project_root),
         "working_tree_dirty": _working_tree_dirty(project_root),
-        "generation_timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "generation_timestamp": generation_timestamp,
         "generating_script": _relative(Path(__file__).resolve(), project_root),
+        "environment": _environment_metadata(),
         "private_sources_excluded": [
             "Dissertation-Requirements.docx",
             "Dissertation-Requirements.pdf",
@@ -119,6 +166,13 @@ def build_dissertation_assets(
     manifest_path = output_root / "manifest.json"
     _write_json(manifest_path, manifest)
     _write_json(paths["manifests"] / "manifest.json", manifest)
+
+    package_result = _package_assets(output_root, paths["manifests"], project_root, generation_timestamp)
+    manifest["asset_package"] = package_result["package"]
+    manifest["artefacts"].extend(package_result["artefacts"])
+    _write_json(manifest_path, manifest)
+    _write_json(paths["manifests"] / "manifest.json", manifest)
+
     manifest["manifest_path"] = _relative(manifest_path, project_root)
     return manifest
 
@@ -453,12 +507,23 @@ def _export_openapi(api_dir: Path, project_root: Path) -> dict[str, Any]:
         openapi = app.openapi()
         path = api_dir / "openapi.json"
         _write_json(path, openapi)
-        return {"artefacts": [_manifest_entry(path, "json", "FastAPI OpenAPI schema", "generated")], "limitations": []}
+        summary_path = api_dir / "openapi_summary.json"
+        _write_json(summary_path, _openapi_summary(openapi))
+        return {
+            "artefacts": [
+                _manifest_entry(path, "json", "FastAPI OpenAPI schema", "generated", chapter="Chapter 3", description="Full OpenAPI schema"),
+                _manifest_entry(summary_path, "json", "FastAPI OpenAPI schema", "generated", chapter="Chapter 3", description="OpenAPI endpoint summary"),
+            ],
+            "limitations": [],
+        }
     except Exception as exc:  # pragma: no cover - defensive documentation path
         path = api_dir / "OPENAPI_EXPORT_LIMITATIONS.md"
         message = f"OpenAPI export could not be completed in this environment: {exc}"
         _write_text(path, f"# OpenAPI Export Limitation\n\n{message}\n")
-        return {"artefacts": [_manifest_entry(path, "limitation", "FastAPI OpenAPI schema", "documented")], "limitations": [message]}
+        return {
+            "artefacts": [_manifest_entry(path, "limitation", "FastAPI OpenAPI schema", "documented", chapter="Chapter 3")],
+            "limitations": [message],
+        }
     finally:
         try:
             sys.path.remove(str(project_root))
@@ -490,12 +555,20 @@ def _export_viva_scenarios(output_dir: Path, project_root: Path) -> dict[str, An
             )
         path = output_dir / "viva_scenario_catalog.json"
         _write_json(path, {"scenarios": scenarios})
-        return {"artefacts": [_manifest_entry(path, "json", "Implemented viva scenario catalog", "generated")], "limitations": []}
+        return {
+            "artefacts": [
+                _manifest_entry(path, "json", "Implemented viva scenario catalog", "generated", chapter="Chapter 5", description="Controlled viva scenario catalog")
+            ],
+            "limitations": [],
+        }
     except Exception as exc:  # pragma: no cover - defensive documentation path
         path = output_dir / "VIVA_SCENARIO_EXPORT_LIMITATIONS.md"
         message = f"Viva scenario export could not be completed in this environment: {exc}"
         _write_text(path, f"# Viva Scenario Export Limitation\n\n{message}\n")
-        return {"artefacts": [_manifest_entry(path, "limitation", "Implemented viva scenario catalog", "documented")], "limitations": [message]}
+        return {
+            "artefacts": [_manifest_entry(path, "limitation", "Implemented viva scenario catalog", "documented", chapter="Chapter 5")],
+            "limitations": [message],
+        }
     finally:
         try:
             sys.path.remove(str(project_root))
@@ -534,6 +607,168 @@ def _architecture_summary() -> dict[str, Any]:
     }
 
 
+def _write_screenshot_framework(screenshot_dir: Path) -> dict[str, Any]:
+    screenshot_plan = {
+        "status": "framework_ready_capture_not_executed",
+        "capture_rule": "Screenshots must be captured from a running SERPS app through an explicit browser automation step. No screenshots are fabricated.",
+        "planned_screenshots": [
+            {"id": "fig4_01_home", "page": "Home", "description": "SERPS home and module overview."},
+            {"id": "fig4_02_enrolment_dashboard", "page": "Enrolment", "description": "Candidate enrolment dashboard."},
+            {"id": "fig4_03_guided_face_capture", "page": "Enrolment", "description": "Guided facial enrolment workflow."},
+            {"id": "fig4_04_session_control", "page": "Session", "description": "Session gating, device checks, and authentication."},
+            {"id": "fig4_05_monitoring_cie", "page": "Monitoring", "description": "Contextual Intelligence Engine monitoring console."},
+            {"id": "fig4_06_ipime_acknowledgement", "page": "Test Player", "description": "Candidate incident acknowledgement workflow where policy requires it."},
+            {"id": "fig4_07_review_workflow", "page": "Review", "description": "Human review workflow for CIE/IPIME alerts."},
+            {"id": "fig4_08_reports", "page": "Reports", "description": "Reports, raw evidence, contextual alerts, and viva scenario validation summary."},
+        ],
+    }
+    screenshot_plan_path = screenshot_dir / "screenshot_plan.json"
+    _write_json(screenshot_plan_path, screenshot_plan)
+
+    limitation = (
+        "Automated screenshot capture is scaffolded for Dissertation Mode but is not executed by this build. "
+        "Future builds should start Streamlit in demo mode and drive the UI with Playwright or an equivalent browser runner. "
+        "No screenshots are fabricated by this pipeline."
+    )
+    screenshot_note = screenshot_dir / "SCREENSHOT_CAPTURE_LIMITATIONS.md"
+    _write_text(screenshot_note, f"# Screenshot Capture Limitation\n\n{limitation}\n")
+    return {
+        "artefacts": [
+            _manifest_entry(screenshot_plan_path, "json", "Screenshot automation framework", "generated", chapter="Chapter 4", description="Planned screenshot capture manifest"),
+            _manifest_entry(screenshot_note, "limitation", "Screenshot automation scaffold", "documented", chapter="Chapter 4", description="Screenshot capture limitation note"),
+        ],
+        "limitations": [limitation],
+    }
+
+
+def _write_test_evidence_framework(testing_dir: Path) -> dict[str, Any]:
+    plan = {
+        "status": "framework_ready_execution_external",
+        "verification_commands": [
+            "python -m py_compile app.py scripts/docs/package_dissertation_assets.py",
+            "python -m pytest -q",
+        ],
+        "evidence_outputs_planned": [
+            "unit_test_summary.json",
+            "integration_test_summary.json",
+            "browser_smoke_test_log.txt",
+            "runtime_warning_scan.json",
+        ],
+        "limitation": "The documentation build records the evidence plan but does not execute the full test suite to avoid side effects during asset packaging.",
+    }
+    path = testing_dir / "test_evidence_plan.json"
+    _write_json(path, plan)
+    return {
+        "artefacts": [
+            _manifest_entry(path, "json", "Testing evidence framework", "generated", chapter="Chapter 4", description="Planned test evidence outputs")
+        ]
+    }
+
+
+def _write_evaluation_assets(evaluation_dir: Path, metrics_dir: Path, charts_dir: Path, project_root: Path) -> dict[str, Any]:
+    scenario_path = evaluation_dir / "viva_scenario_catalog.json"
+    if not scenario_path.exists():
+        return {"artefacts": [], "limitations": ["Viva scenario catalog was unavailable, so evaluation summaries were not generated."]}
+
+    scenarios = json.loads(scenario_path.read_text(encoding="utf-8")).get("scenarios", [])
+    risk_counts = Counter(str(scenario.get("expected_risk_level", "Unknown")) for scenario in scenarios)
+    policy_counts = Counter(str(scenario.get("expected_policy_response", "Unknown")) for scenario in scenarios)
+    event_counts = Counter(event_type for scenario in scenarios for event_type in scenario.get("event_types", []))
+
+    summary = {
+        "scenario_count": len(scenarios),
+        "risk_distribution": dict(sorted(risk_counts.items())),
+        "policy_response_distribution": dict(sorted(policy_counts.items())),
+        "event_type_distribution": dict(sorted(event_counts.items())),
+        "source": "src/evaluation/viva_scenarios.py",
+    }
+    summary_path = evaluation_dir / "viva_scenario_summary.json"
+    _write_json(summary_path, summary)
+
+    risk_csv_path = metrics_dir / "risk_distribution.csv"
+    _write_csv(risk_csv_path, ["risk_level", "count"], sorted(risk_counts.items()))
+
+    policy_csv_path = metrics_dir / "policy_response_distribution.csv"
+    _write_csv(policy_csv_path, ["policy_response", "count"], sorted(policy_counts.items()))
+
+    risk_chart_path = charts_dir / "risk_distribution.svg"
+    _write_bar_chart_svg(risk_chart_path, "Viva Scenario Expected Risk Distribution", dict(sorted(risk_counts.items())))
+
+    return {
+        "artefacts": [
+            _manifest_entry(summary_path, "json", "Implemented viva scenario catalog", "generated", chapter="Chapter 5", description="Evaluation scenario summary"),
+            _manifest_entry(risk_csv_path, "csv", "Implemented viva scenario catalog", "generated", chapter="Chapter 5", description="Risk distribution source data"),
+            _manifest_entry(policy_csv_path, "csv", "Implemented viva scenario catalog", "generated", chapter="Chapter 5", description="Policy response distribution source data"),
+            _manifest_entry(risk_chart_path, "svg", "Implemented viva scenario catalog", "generated", chapter="Chapter 5", description="Risk distribution chart"),
+        ],
+        "limitations": [],
+    }
+
+
+def _openapi_summary(openapi: dict[str, Any]) -> dict[str, Any]:
+    endpoints = []
+    for path, methods in sorted(openapi.get("paths", {}).items()):
+        for method, operation in sorted(methods.items()):
+            endpoints.append(
+                {
+                    "method": method.upper(),
+                    "path": path,
+                    "summary": operation.get("summary") or operation.get("operationId", ""),
+                }
+            )
+    return {"title": openapi.get("info", {}).get("title"), "endpoint_count": len(endpoints), "endpoints": endpoints}
+
+
+def _asset_index(artefacts: list[dict[str, Any]]) -> dict[str, Any]:
+    by_chapter: dict[str, list[dict[str, Any]]] = {}
+    for artefact in artefacts:
+        by_chapter.setdefault(str(artefact.get("chapter") or "General"), []).append(artefact)
+    return {
+        "chapters": {chapter: sorted(items, key=lambda item: item["path"]) for chapter, items in sorted(by_chapter.items())},
+        "artefact_count": len(artefacts),
+    }
+
+
+def _environment_metadata() -> dict[str, str]:
+    return {
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "mermaid_cli": shutil.which("mmdc") or "not installed",
+    }
+
+
+def _package_assets(output_root: Path, manifests_dir: Path, project_root: Path, generation_timestamp: str) -> dict[str, Any]:
+    package_path = output_root / "dissertation_assets.zip"
+    if package_path.exists():
+        package_path.unlink()
+    included_files: list[str] = []
+    with zipfile.ZipFile(package_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(output_root.rglob("*")):
+            if path.is_file() and path != package_path:
+                relative = _relative(path, output_root)
+                archive.write(path, relative)
+                included_files.append(relative)
+
+    package_manifest = {
+        "package": _relative(package_path, project_root),
+        "serps_version": SERPS_VERSION,
+        "generation_timestamp": generation_timestamp,
+        "file_count": len(included_files),
+        "checksum_sha256": _sha256(package_path),
+        "included_files": included_files,
+        "note": "The zip package contains the generated dissertation assets. The root manifest records the package checksum after packaging.",
+    }
+    package_manifest_path = manifests_dir / "package_manifest.json"
+    _write_json(package_manifest_path, package_manifest)
+    return {
+        "package": package_manifest,
+        "artefacts": [
+            _manifest_entry(package_path, "zip", "Dissertation asset packaging", "generated", description="Packaged generated dissertation assets"),
+            _manifest_entry(package_manifest_path, "json", "Dissertation asset packaging", "generated", description="Package manifest and checksum"),
+        ],
+    }
+
+
 def _captions_markdown(captions: list[dict[str, str]]) -> str:
     lines = ["# SERPS Figure Captions", ""]
     for item in captions:
@@ -550,14 +785,68 @@ def _captions_markdown(captions: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _manifest_entry(path: Path, artefact_type: str, source: str, status: str) -> dict[str, str]:
-    return {
+def _manifest_entry(
+    path: Path,
+    artefact_type: str,
+    source: str,
+    status: str,
+    *,
+    chapter: str | None = None,
+    figure: str | None = None,
+    description: str | None = None,
+) -> dict[str, str]:
+    entry = {
         "path": _relative(path, PROJECT_ROOT),
         "artefact_type": artefact_type,
         "source": source,
         "status": status,
         "checksum_sha256": _sha256(path),
     }
+    if chapter:
+        entry["chapter"] = chapter
+    if figure:
+        entry["figure"] = figure
+    if description:
+        entry["description"] = description
+    return entry
+
+
+def _write_csv(path: Path, headers: list[str], rows: list[tuple[Any, Any]]) -> None:
+    content = ",".join(headers) + "\n"
+    for first, second in rows:
+        content += f"\"{str(first).replace('\"', '\"\"')}\",{second}\n"
+    _write_text(path, content)
+
+
+def _write_bar_chart_svg(path: Path, title: str, values: dict[str, int]) -> None:
+    width = 760
+    height = 360
+    margin_left = 120
+    bar_height = 34
+    gap = 20
+    max_value = max(values.values(), default=1)
+    rows = []
+    for index, (label, value) in enumerate(values.items()):
+        y = 78 + index * (bar_height + gap)
+        bar_width = int((width - margin_left - 90) * (value / max_value)) if max_value else 0
+        rows.append(
+            f'<text x="24" y="{y + 23}" font-family="Arial" font-size="14" fill="#102033">{_escape_xml(label)}</text>'
+            f'<rect x="{margin_left}" y="{y}" width="{bar_width}" height="{bar_height}" fill="#008b84" rx="4" />'
+            f'<text x="{margin_left + bar_width + 12}" y="{y + 23}" font-family="Arial" font-size="14" fill="#102033">{value}</text>'
+        )
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
+        '<rect width="100%" height="100%" fill="#ffffff" />'
+        f'<text x="24" y="38" font-family="Arial" font-size="20" font-weight="700" fill="#102033">{_escape_xml(title)}</text>'
+        f'{"".join(rows)}'
+        '<text x="24" y="334" font-family="Arial" font-size="12" fill="#596b7a">Generated from SERPS viva scenario definitions.</text>'
+        "</svg>"
+    )
+    _write_text(path, svg)
+
+
+def _escape_xml(value: str) -> str:
+    return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 def _figure_token(figure: str) -> str:

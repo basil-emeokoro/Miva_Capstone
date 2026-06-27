@@ -178,10 +178,12 @@ The current pipeline generates:
 
 - Chapter Three editable Mermaid diagrams for high-level architecture, layered architecture, workflow, use case, activity, sequence, ERD, system flowchart, and API interaction model.
 - An ER diagram generated from `src/storage/database.py`.
-- FastAPI `openapi.json` generated from `src/services/event_api.py`.
-- Chapter Five viva scenario catalog generated from `src/evaluation/viva_scenarios.py`.
+- FastAPI `openapi.json` and endpoint summary generated from `src/services/event_api.py`.
+- Chapter Four screenshot and test-evidence plans. These define required captures and verification outputs without fabricating screenshots.
+- Chapter Five viva scenario catalog, evaluation summary, risk/policy CSV data, and risk-distribution SVG chart generated from `src/evaluation/viva_scenarios.py`.
 - Separate captions in JSON and Markdown.
-- A version-aware manifest with Git commit, timestamp, script name, artefact paths, and SHA-256 checksums.
+- A version-aware manifest with Git commit, timestamp, script name, environment metadata, artefact paths, and SHA-256 checksums.
+- `dissertation_assets.zip`, a packaged archive of generated dissertation assets.
 
 Generated implementation artefacts are stored under `docs/dissertation/`. Private requirement files and dissertation-writing drafts remain untracked.
 

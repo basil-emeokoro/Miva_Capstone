@@ -220,3 +220,13 @@
 - `v1.0.0-feature-complete` marks the feature-complete SERPS implementation before documentation automation.
 - `v1.1.0-documentation-framework` marks the Documentation Automation Framework foundation commit.
 - Milestone tags are used to identify reproducible implementation states for dissertation figures, Chapter 4/5 evidence, viva rehearsals, and future release packaging.
+
+## Documentation Automation Framework Sprint 1 Extension
+
+- Extended the dissertation asset pipeline without changing SERPS architecture or adding new runtime features.
+- Added OpenAPI endpoint summary generation alongside the full OpenAPI JSON export.
+- Added Chapter Four screenshot and test-evidence planning outputs so the framework knows what to capture without fabricating screenshots or logs.
+- Added Chapter Five evaluation artefacts derived from the implemented viva scenario catalog: scenario summary JSON, risk-distribution CSV, policy-response CSV, and risk-distribution SVG.
+- Added a grouped asset index and richer manifest metadata including chapter, figure, description, environment, and package metadata.
+- Added `docs/dissertation/dissertation_assets.zip` packaging for generated dissertation artefacts.
+- Expanded pytest coverage to verify the package, asset index, OpenAPI summary, screenshot plan, scenario summary, chart output, and manifest package checksum.

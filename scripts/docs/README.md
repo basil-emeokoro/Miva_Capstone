@@ -14,8 +14,11 @@ The pipeline currently generates:
 - FastAPI OpenAPI JSON when the local service package is importable;
 - an ER diagram derived from the SQLite schema definition;
 - viva scenario catalog data derived from the implementation;
+- screenshot and test-evidence plans for Chapter Four;
+- Chapter Five evaluation summaries, CSV data, and SVG chart outputs derived from the viva scenario catalog;
 - figure captions stored separately from the figures;
 - a manifest with SERPS version, Git commit, generation timestamp, script name, and SHA-256 checksums.
+- a packaged `dissertation_assets.zip` archive.
 
 PNG/SVG rendering is optional and depends on Mermaid CLI (`mmdc`) being available locally. When the renderer is not installed, the pipeline records a limitation note instead of fabricating static images.
 

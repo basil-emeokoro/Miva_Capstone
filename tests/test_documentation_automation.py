@@ -20,12 +20,16 @@ def test_dissertation_asset_pipeline_generates_manifest_and_core_assets(tmp_path
     assert any(path.endswith("openapi.json") for path in artefact_paths)
     assert any(path.endswith("viva_scenario_catalog.json") for path in artefact_paths)
     assert any(path.endswith("captions.json") for path in artefact_paths)
+    assert any(path.endswith("asset_index.json") for path in artefact_paths)
+    assert any(path.endswith("dissertation_assets.zip") for path in artefact_paths)
 
     manifest_path = output_root / "manifests" / "manifest.json"
     assert manifest_path.exists()
     written_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert len(written_manifest["artefacts"]) >= 16
+    assert len(written_manifest["artefacts"]) >= 26
+    assert written_manifest["asset_package"]["checksum_sha256"]
     assert all(entry["checksum_sha256"] for entry in written_manifest["artefacts"])
+    assert all("status" in entry for entry in written_manifest["artefacts"])
 
 
 def test_dissertation_asset_pipeline_exports_implementation_derived_content(tmp_path: Path) -> None:
@@ -50,3 +54,21 @@ def test_dissertation_asset_pipeline_exports_implementation_derived_content(tmp_
     assert "/vision/analyse-frame" in openapi["paths"]
     assert "/audio/analyse-features" in openapi["paths"]
     assert "/identity/analyse-confidence" in openapi["paths"]
+
+    openapi_summary = json.loads((output_root / "chapter3" / "api" / "openapi_summary.json").read_text(encoding="utf-8"))
+    assert openapi_summary["endpoint_count"] >= 4
+
+    scenario_summary = json.loads(
+        (output_root / "chapter5" / "evaluation" / "viva_scenario_summary.json").read_text(encoding="utf-8")
+    )
+    assert scenario_summary["scenario_count"] == 10
+    assert scenario_summary["risk_distribution"]["Critical"] >= 1
+
+    screenshot_plan = json.loads(
+        (output_root / "chapter4" / "screenshots" / "screenshot_plan.json").read_text(encoding="utf-8")
+    )
+    assert screenshot_plan["status"] == "framework_ready_capture_not_executed"
+    assert len(screenshot_plan["planned_screenshots"]) >= 8
+
+    assert (output_root / "chapter5" / "charts" / "risk_distribution.svg").exists()
+    assert (output_root / "dissertation_assets.zip").exists()

@@ -1,0 +1,46 @@
+{
+  "capture_rule": "Screenshots must be captured from a running SERPS app through an explicit browser automation step. No screenshots are fabricated.",
+  "planned_screenshots": [
+    {
+      "description": "SERPS home and module overview.",
+      "id": "fig4_01_home",
+      "page": "Home"
+    },
+    {
+      "description": "Candidate enrolment dashboard.",
+      "id": "fig4_02_enrolment_dashboard",
+      "page": "Enrolment"
+    },
+    {
+      "description": "Guided facial enrolment workflow.",
+      "id": "fig4_03_guided_face_capture",
+      "page": "Enrolment"
+    },
+    {
+      "description": "Session gating, device checks, and authentication.",
+      "id": "fig4_04_session_control",
+      "page": "Session"
+    },
+    {
+      "description": "Contextual Intelligence Engine monitoring console.",
+      "id": "fig4_05_monitoring_cie",
+      "page": "Monitoring"
+    },
+    {
+      "description": "Candidate incident acknowledgement workflow where policy requires it.",
+      "id": "fig4_06_ipime_acknowledgement",
+      "page": "Test Player"
+    },
+    {
+      "description": "Human review workflow for CIE/IPIME alerts.",
+      "id": "fig4_07_review_workflow",
+      "page": "Review"
+    },
+    {
+      "description": "Reports, raw evidence, contextual alerts, and viva scenario validation summary.",
+      "id": "fig4_08_reports",
+      "page": "Reports"
+    }
+  ],
+  "status": "framework_ready_capture_not_executed"
+}

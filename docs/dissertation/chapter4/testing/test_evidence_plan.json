@@ -1,0 +1,14 @@
+{
+  "evidence_outputs_planned": [
+    "unit_test_summary.json",
+    "integration_test_summary.json",
+    "browser_smoke_test_log.txt",
+    "runtime_warning_scan.json"
+  ],
+  "limitation": "The documentation build records the evidence plan but does not execute the full test suite to avoid side effects during asset packaging.",
+  "status": "framework_ready_execution_external",
+  "verification_commands": [
+    "python -m py_compile app.py scripts/docs/package_dissertation_assets.py",
+    "python -m pytest -q"
+  ]
+}

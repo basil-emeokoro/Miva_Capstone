@@ -1,0 +1,31 @@
+{
+  "endpoint_count": 5,
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/audio/analyse-features",
+      "summary": "Analyse Audio"
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "summary": "Ingest Event"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "summary": "Health"
+    },
+    {
+      "method": "POST",
+      "path": "/identity/analyse-confidence",
+      "summary": "Analyse Identity"
+    },
+    {
+      "method": "POST",
+      "path": "/vision/analyse-frame",
+      "summary": "Analyse Vision Frame"
+    }
+  ],
+  "title": "SERPS Structured Event API"
+}

@@ -1,0 +1,28 @@
+{
+  "event_type_distribution": {
+    "background_speech": 3,
+    "camera_disconnected": 1,
+    "camera_ready": 1,
+    "face_absent": 2,
+    "face_mismatch": 2,
+    "face_present": 1,
+    "identity_substitution": 1,
+    "looking_away": 3,
+    "mobile_phone_detected": 2,
+    "multiple_persons_detected": 2
+  },
+  "policy_response_distribution": {
+    "Generic critical-risk senior review workflow": 2,
+    "Generic observation workflow": 2,
+    "University warning and review workflow": 3,
+    "WAEC incident acknowledgement workflow": 3
+  },
+  "risk_distribution": {
+    "Critical": 2,
+    "High": 3,
+    "Low": 2,
+    "Medium": 3
+  },
+  "scenario_count": 10,
+  "source": "src/evaluation/viva_scenarios.py"
+}

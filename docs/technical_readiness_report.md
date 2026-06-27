@@ -167,9 +167,9 @@ SERPS now includes a Documentation Automation Framework foundation. It supports 
 python scripts/docs/package_dissertation_assets.py
 ```
 
-Current generated artefacts include editable Mermaid diagrams for Chapter Three architecture figures, a SQLite-derived ERD, FastAPI OpenAPI JSON, a Chapter Five viva scenario catalog, separate captions, and a manifest with checksums and version metadata.
+Current generated artefacts include editable Mermaid diagrams for Chapter Three architecture figures, a SQLite-derived ERD, FastAPI OpenAPI JSON and endpoint summary, Chapter Four screenshot/test-evidence plans, a Chapter Five viva scenario catalog, evaluation summaries, CSV metric outputs, a risk-distribution SVG chart, separate captions, an asset index, a packaged `dissertation_assets.zip`, and a manifest with checksums, version metadata, environment metadata, and package metadata.
 
-Status: **Partially Implemented**. The framework is ready for controlled dissertation artefact generation, but screenshot capture, test-report export, rendered SVG/PNG diagram export, and evaluation chart generation still need strengthening. Mermaid rendering depends on local Mermaid CLI (`mmdc`); the current environment records this limitation and preserves editable sources.
+Status: **Partially Implemented**. The framework is ready for controlled dissertation artefact generation and packaging, but live screenshot capture, automated test-report execution, rendered architecture SVG/PNG export, and richer evaluation charts still need strengthening. Mermaid rendering depends on local Mermaid CLI (`mmdc`); the current environment records this limitation and preserves editable sources.
 
 Recommended next documentation action: add automated screenshot capture through a controlled browser runner and add evaluation chart generation from stored viva scenario outputs.
 
