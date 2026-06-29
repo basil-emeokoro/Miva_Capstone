@@ -18,8 +18,9 @@ AI modules do not punish candidates. Detection modules generate evidence events,
 - Admin, Human Proctor, and Reviewer RBAC
 - Mode A, B, and C monitoring configuration
 - Dual-camera stream status foundation using common event schema
+- Viva split-screen demonstration mode separating candidate-facing exam experience from reviewer/proctor intelligence
 - Visual intelligence event foundation for face, camera, gaze/head-pose, person-count, and object-related evidence events
-- Live-detection integration foundation with OpenCV frame analysis, optional MediaPipe/YOLO-ready adapters, modular audio event definitions, and a FastAPI structured-event boundary
+- Live-detection integration foundation with OpenCV frame analysis from explicitly sampled camera frames, optional MediaPipe/YOLO-ready adapters, modular audio event definitions, and a FastAPI structured-event boundary
 - Lightweight mock assessment/test player
 - Demo visual, identity, and audio event generation
 - Contextual Intelligence Engine with Event Fusion Module, Temporal Behaviour Memory, Risk Scoring Engine, Contextual Reasoning Module, and Explainability Interface
@@ -99,10 +100,12 @@ pip install ultralytics mediapipe
 
 - The Monitoring page exposes primary and secondary camera slots without activating camera hardware.
 - Monitoring includes an active/reporting session selector, monitoring-mode display, primary/secondary selectors, requirement cards, readiness status cards, and manual readiness/missing/disconnected event hooks.
+- The live dual-camera validation panel can explicitly sample selected physical cameras, display labelled Primary/Secondary frames, record FPS/resolution/status, and pass sampled frames into detector modules.
 - Camera readiness and health events are persisted through the same SQLite `events` table used by visual, audio, identity, and behavioural events.
 - Camera events use the common evidence-event schema and are ready for Contextual Intelligence Engine ingestion.
 - Streamlit remains the UI/control shell for dashboards, manual prototype hooks, review, and report preview. It is not the real monitoring engine.
 - Continuous monitoring should be driven later by service boundaries such as FastAPI endpoints, OpenCV/background workers, `streamlit-webrtc`, WebRTC/browser streams, or an external secure exam-player integration.
+- Runtime camera activation remains explicit. No physical camera is opened on page load; live validation opens selected devices only after the user starts a validation run and releases them after sampling.
 
 ## Visual Intelligence Foundation
 
@@ -125,6 +128,7 @@ pip install ultralytics mediapipe
 - The API includes service-ready endpoints for frame analysis, audio feature-window analysis, identity-confidence analysis, and generic structured-event ingestion.
 - Streamlit remains an operations dashboard and demo control surface. It is not the monitoring engine.
 - Monitoring supports both Live AI mode and Demonstration/Simulation mode. Live AI mode is currently user-triggered through still-frame upload and audio feature windows; continuous camera/audio monitoring remains a backend service responsibility.
+- Live dual-camera validation now bridges sampled frames into the same perception pipeline: physical camera sample -> frame encoding -> detector analysis -> `EvidenceEvent` -> CIE ingestion. Simulation controls remain available and clearly labelled for viva stability.
 
 ## Contextual Intelligence Engine
 
@@ -207,7 +211,7 @@ SERPS uses annotated Git milestone tags to support dissertation traceability, vi
 - `v1.0.0-feature-complete`: Feature-complete SERPS Version 1.0 implementation before documentation automation. This marks the stable governance platform baseline.
 - `v1.1.0-documentation-framework`: Documentation Automation Framework foundation. This marks the point where SERPS begins generating dissertation artefacts directly from the implementation.
 
-Future milestone tags such as `v1.2.0-dissertation-mode` and `v1.3.0-release-candidate` should only be created when those milestones are completed.
+Future milestone tags such as `v1.2.0-live-ai-validation` and `v1.3.0-release-candidate` should only be created when those milestones are genuinely completed and verified.
 
 ## Monitoring Roadmap
 

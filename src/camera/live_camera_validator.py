@@ -146,6 +146,18 @@ def live_camera_event(session_id: str, candidate_id: str, sample: LiveCameraSamp
     )
 
 
+def sample_frame_to_jpeg_bytes(sample: LiveCameraSample) -> bytes | None:
+    """Encode a captured RGB sample frame for downstream detector modules."""
+
+    if sample.frame_rgb is None:
+        return None
+    bgr_frame = cv2.cvtColor(sample.frame_rgb, cv2.COLOR_RGB2BGR)
+    ok, encoded = cv2.imencode(".jpg", bgr_frame)
+    if not ok:
+        return None
+    return encoded.tobytes()
+
+
 def _preferred_backend() -> int:
     if platform.system().lower() == "windows":
         return cv2.CAP_DSHOW
@@ -164,4 +176,3 @@ def _release_capture(capture: object) -> None:
     release = getattr(capture, "release", None)
     if callable(release):
         release()
-

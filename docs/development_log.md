@@ -239,3 +239,14 @@
 - Monitoring now includes an explicit live dual-camera capability test: physical camera discovery, primary/secondary selection, side-by-side labelled frame previews, FPS/resolution/status display, and structured camera events that feed the existing CIE.
 - The privacy rule remains intact: physical cameras are not opened on page load; discovery and validation require explicit user action and release selected devices after sampling.
 - Added pytest coverage using fake camera captures so live camera validation logic remains testable without hardware in CI.
+
+## Release Candidate Live Proctoring Demonstration Hardening
+
+- Added a viva split-screen demonstration mode in Monitoring to show a candidate-facing exam view beside a reviewer/proctor intelligence view.
+- Candidate view shows identity, mock exam context, timer, authentication/monitoring status, and due-process incident acknowledgement when IPIME requires it. It does not expose CIE internals, risk scores, policy rules, or reviewer decisions.
+- Reviewer/proctor view shows the governance pipeline, CIE risk/confidence/recommendation, primary/secondary camera evidence status, recent event timeline, explainability, IPIME response, and reviewer action capture.
+- Extended live dual-camera validation so explicitly sampled physical camera frames can be encoded and passed into visual detector modules.
+- Live sampled frames can now generate stream-health evidence and detector-derived visual evidence before ingestion by the Contextual Intelligence Engine.
+- Optional secondary object detection remains guarded behind an explicit control and continues gracefully if the local YOLO adapter/model is unavailable.
+- Manual demonstration/simulation controls remain available and labelled as fallback controls for viva reliability.
+- The architecture remains unchanged: hardware and detectors produce structured evidence only; CIE reasons over evidence; Agentic Decision Support recommends; IPIME applies procedure; human reviewers decide.

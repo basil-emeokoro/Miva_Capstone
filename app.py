@@ -30,6 +30,7 @@ from src.camera.live_camera_validator import (
     capture_live_camera_sample,
     discover_physical_cameras,
     live_camera_event,
+    sample_frame_to_jpeg_bytes,
 )
 from src.enrolment.consent_manager import CONSENT_NOTICE, capture_consent
 from src.enrolment.face_enrolment import (
@@ -2129,6 +2130,81 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
             st.info("No camera/system events have been recorded for this session yet.")
 
 
+def persist_event_and_ingest(event: EvidenceEvent, role: str, audit_action: str, audit_detail: str = "") -> None:
+    save_event(event)
+    alert = st.session_state.contextual_intelligence_engine.ingest(event)
+    if alert:
+        save_alert(alert)
+    log_audit(role, audit_action, event.event_id, audit_detail or f"{event.camera_id}:{event.event_type}")
+
+
+def run_live_camera_sample_detection(
+    session_id: str,
+    candidate_id: str,
+    sample: LiveCameraSample,
+    role: str,
+    run_object_detection: bool,
+) -> dict[str, object]:
+    """Persist live stream health and detector evidence from one explicitly captured sample."""
+
+    detector_notes: list[str] = []
+    saved_event_types: list[str] = []
+    stream_event = live_camera_event(session_id, candidate_id, sample)
+    persist_event_and_ingest(
+        stream_event,
+        role,
+        "live_camera_validation_event",
+        f"{stream_event.camera_id}:{stream_event.event_type}",
+    )
+    saved_event_types.append(stream_event.event_type)
+
+    if not sample.connected:
+        return {
+            "role": sample.role,
+            "stream_event": stream_event.event_type,
+            "visual_events": [],
+            "detector_notes": [sample.message or "Camera did not provide a live frame."],
+        }
+
+    image_bytes = sample_frame_to_jpeg_bytes(sample)
+    if image_bytes is None:
+        detector_notes.append("Live frame could not be encoded for detector analysis.")
+        return {
+            "role": sample.role,
+            "stream_event": stream_event.event_type,
+            "visual_events": [],
+            "detector_notes": detector_notes,
+        }
+
+    face_result = analyse_face_presence(image_bytes)
+    evidence_path = store_visual_evidence(session_id, candidate_id, f"live_{sample.role}_{face_result.status}", image_bytes)
+    analysis = create_events_from_frame_analysis(
+        session_id=session_id,
+        candidate_id=candidate_id,
+        face_result=face_result,
+        camera_id=sample.role,
+        evidence_path=str(evidence_path),
+        image_bytes=image_bytes,
+        run_object_detection=run_object_detection,
+    )
+    for visual_event in analysis.events:
+        persist_event_and_ingest(
+            visual_event,
+            role,
+            "live_camera_detector_event",
+            f"{visual_event.camera_id}:{visual_event.event_type}",
+        )
+        saved_event_types.append(visual_event.event_type)
+    detector_notes.extend(analysis.detector_notes)
+    return {
+        "role": sample.role,
+        "stream_event": stream_event.event_type,
+        "visual_events": [event.event_type for event in analysis.events],
+        "detector_notes": detector_notes,
+        "saved_event_types": saved_event_types,
+    }
+
+
 def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: str, mode: str) -> None:
     required_roles = required_camera_roles(mode)
     state_key = f"live_camera_devices_{session_id}"
@@ -2202,9 +2278,22 @@ def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: 
             value=True,
             key=f"live_camera_record_events_{session_id}",
         )
+        run_live_detectors = st.checkbox(
+            "Run live detector pipeline on captured frames",
+            value=True,
+            key=f"live_camera_run_detectors_{session_id}",
+            help="When enabled, sampled frames are encoded and passed to the visual detector layer to create structured evidence events.",
+        )
+        run_secondary_objects = st.checkbox(
+            "Attempt secondary object detection / YOLO adapter if available",
+            value=False,
+            key=f"live_camera_run_yolo_{session_id}",
+            help="Optional. If the local YOLO adapter/model is unavailable, SERPS records detector notes and continues without failing the demo.",
+        )
 
         if st.button("Start / refresh live dual-camera validation", key=f"start_live_dual_camera_{session_id}"):
             samples: list[LiveCameraSample] = []
+            detection_results: list[dict[str, object]] = []
             with st.spinner("Opening selected cameras for controlled validation..."):
                 samples.append(capture_live_camera_sample(primary_device.index, "primary", sample_frames=int(sample_frames)))
                 if secondary_device:
@@ -2221,13 +2310,26 @@ def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: 
             st.session_state[sample_key] = samples
             if record_to_cie:
                 for sample in samples:
-                    event = live_camera_event(session_id, candidate_id, sample)
-                    save_event(event)
-                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
-                    if alert:
-                        save_alert(alert)
-                    log_audit(role, "live_camera_validation_event", event.event_id, f"{event.camera_id}:{event.event_type}")
+                    if run_live_detectors:
+                        detection_results.append(
+                            run_live_camera_sample_detection(
+                                session_id=session_id,
+                                candidate_id=candidate_id,
+                                sample=sample,
+                                role=role,
+                                run_object_detection=sample.role == "secondary" and run_secondary_objects,
+                            )
+                        )
+                    else:
+                        event = live_camera_event(session_id, candidate_id, sample)
+                        persist_event_and_ingest(
+                            event,
+                            role,
+                            "live_camera_validation_event",
+                            f"{event.camera_id}:{event.event_type}",
+                        )
                 clear_app_caches()
+            st.session_state[f"live_camera_detection_results_{session_id}"] = detection_results
             st.success("Live dual-camera validation completed and selected devices were released.")
 
         samples = st.session_state.get(sample_key, [])
@@ -2248,6 +2350,19 @@ def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: 
                         st.image(sample.frame_rgb, caption=f"{title} live validation frame", width="stretch")
                     else:
                         st.warning(sample.message or f"{title} is unavailable.")
+            detection_results = st.session_state.get(f"live_camera_detection_results_{session_id}", [])
+            if detection_results:
+                st.write("Live AI evidence generated from sampled frames")
+                for result in detection_results:
+                    with st.container(border=True):
+                        st.write(f"**{str(result.get('role')).title()} camera detector output**")
+                        visual_events = result.get("visual_events") or []
+                        if visual_events:
+                            st.success(f"Structured visual events: {', '.join(str(item) for item in visual_events)}")
+                        else:
+                            st.info(f"Stream event only: {result.get('stream_event')}")
+                        for note in result.get("detector_notes", []):
+                            st.caption(str(note))
         else:
             st.caption("No live validation sample has been captured yet.")
 
@@ -2579,6 +2694,158 @@ def render_correlation_chips(summary: dict[str, object]) -> None:
     confidence = float(summary.get("confidence") or 0)
     risk = str(summary.get("risk", "Low")).upper()
     st.caption(f"Contextual confidence: {confidence:.0%} | Risk: {risk}")
+
+
+def pending_candidate_incident_decision(session_id: str) -> dict[str, object] | None:
+    for decision in cached_policy_decisions(session_id):
+        if (
+            decision.get("require_acknowledgement")
+            and decision.get("status") == "awaiting_candidate_acknowledgement"
+            and not list_candidate_acknowledgements(str(decision["decision_id"]))
+        ):
+            return decision
+    return None
+
+
+def render_candidate_exam_demo_view(session_id: str, candidate_id: str) -> None:
+    candidate = get_candidate(candidate_id) or {}
+    questions = load_sample_questions()
+    first_question = questions[0] if questions else None
+    incident_decision = pending_candidate_incident_decision(session_id)
+
+    st.markdown("##### Candidate View")
+    st.caption("Secure exam interface shown to the candidate. CIE risk, policy rules, and reviewer decisions are hidden.")
+    with st.container(border=True):
+        identity_cols = st.columns([2, 1])
+        with identity_cols[0]:
+            st.write("**Candidate identity**")
+            st.write(str(candidate.get("full_name") or "Selected candidate"))
+            st.caption(f"Candidate ID: {candidate_id}")
+        with identity_cols[1]:
+            st.metric("Authentication", "Verified")
+            st.caption("Session monitoring active")
+        st.divider()
+        col_exam, col_timer = st.columns([3, 1])
+        with col_exam:
+            st.write("**SERPS Mock Assessment**")
+            st.caption("Candidate-facing assessment view for viva demonstration.")
+        with col_timer:
+            st.metric("Timer", "24:18")
+        if incident_decision:
+            st.warning("Assessment paused: incident acknowledgement required.")
+            st.info(
+                "A potential examination integrity concern has been detected. Please provide your explanation. "
+                "Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
+            )
+            with st.form(f"split_candidate_ack_{incident_decision['decision_id']}"):
+                explanation = st.text_area("Candidate explanation")
+                acknowledged = st.checkbox("I acknowledge that my explanation will be reviewed by an authorised examination official.")
+                submitted = st.form_submit_button("Submit acknowledgement")
+            if submitted:
+                if not explanation.strip() or not acknowledged:
+                    st.error("Provide an explanation and tick the acknowledgement checkbox before submitting.")
+                else:
+                    ack_id = record_candidate_acknowledgement(
+                        str(incident_decision["decision_id"]),
+                        candidate_id,
+                        explanation,
+                        acknowledged,
+                    )
+                    log_audit("Candidate", "incident_acknowledged", ack_id, f"decision_id={incident_decision['decision_id']}; session_id={session_id}")
+                    clear_app_caches()
+                    st.success("Acknowledgement recorded for authorised review.")
+                    st.rerun()
+        elif first_question:
+            st.write("**Question 1**")
+            st.write(str(first_question["prompt"]))
+            selected = st.radio(
+                "Answer options",
+                list(first_question["options"]),
+                key=f"split_candidate_question_{session_id}",
+                disabled=True,
+            )
+            st.caption(f"Selected answer preview: {selected}")
+        st.success("Monitoring status: active. Camera access remains explicit and user-triggered.")
+
+
+def render_reviewer_proctor_demo_view(session_id: str, candidate_id: str, role: str) -> None:
+    events = cached_events(session_id)
+    latest_alert = latest_alert_for_session(session_id)
+    metrics = resolved_alert_metrics(latest_alert, events)
+    policy_decision = cached_policy_decisions(session_id)[0] if cached_policy_decisions(session_id) else None
+
+    st.markdown("##### Reviewer / Proctor View")
+    st.caption("Reviewer-facing intelligence console. This view is not shown to candidates in production.")
+    with st.container(border=True):
+        st.write("**Governance pipeline**")
+        stage_cols = st.columns(5)
+        for column, label in zip(stage_cols, ["Evidence", "CIE", "Agent", "IPIME", "Human Review"], strict=True):
+            column.button(label, disabled=True, width="stretch", key=f"split_pipeline_{session_id}_{label}")
+        status_cols = st.columns(4)
+        with status_cols[0]:
+            st.metric("CIE risk", f"{metrics['risk_score']} / {metrics['risk_level']}")
+        with status_cols[1]:
+            st.metric("Confidence", f"{float(metrics['confidence']):.0%}")
+        with status_cols[2]:
+            st.metric("Recommendation", reviewer_action_label(latest_alert))
+        with status_cols[3]:
+            st.metric("IPIME", str(policy_decision.get("workflow_label") if policy_decision else "Awaiting policy trigger"))
+
+        st.write("**Primary / Secondary Camera Intelligence**")
+        camera_events = [event for event in events if str(event.get("event_type", "")).startswith("camera_")]
+        camera_cols = st.columns(2)
+        for camera_col, camera_id, label in zip(camera_cols, ["primary", "secondary"], ["Primary Camera", "Secondary Camera"], strict=True):
+            camera_event = next((event for event in camera_events if str(event.get("camera_id")) == camera_id), None)
+            with camera_col:
+                st.write(f"**{label}**")
+                if camera_event:
+                    st.metric("Latest status", event_display_name(camera_event.get("event_type")))
+                    st.caption(str(camera_event.get("description") or "Structured camera evidence."))
+                else:
+                    st.info("No live camera evidence recorded yet.")
+
+        st.write("**Recent evidence timeline**")
+        render_event_timeline(events, limit=4)
+        if latest_alert:
+            st.write("**Explainability**")
+            st.info(str(latest_alert.get("explanation") or "No explanation was stored."))
+        if policy_decision:
+            st.write("**IPIME policy response**")
+            st.warning(str(policy_decision.get("candidate_message") or "Policy response recorded."))
+        if latest_alert and has_permission(role, "review_alerts"):
+            with st.form(f"split_review_action_{latest_alert['alert_id']}"):
+                action = st.selectbox(
+                    "Reviewer action",
+                    ["accepted", "rejected", "escalated"],
+                    format_func=lambda value: {
+                        "accepted": "Accept as review concern",
+                        "rejected": "Reject / false positive",
+                        "escalated": "Escalate for senior review",
+                    }[value],
+                )
+                rationale = st.text_area("Reviewer rationale")
+                submitted = st.form_submit_button("Record reviewer action")
+            if submitted:
+                if not rationale.strip():
+                    st.error("Reviewer rationale is required.")
+                else:
+                    record_review(str(latest_alert["alert_id"]), role, action, rationale)
+                    clear_app_caches()
+                    st.success("Reviewer action recorded. Final institutional decision remains human-led.")
+                    st.rerun()
+
+
+def viva_split_screen_demo_panel(role: str, session_id: str, candidate_id: str) -> None:
+    with st.expander("Viva Split-Screen Demonstration Mode", expanded=True):
+        st.caption(
+            "Demonstration-only view showing candidate-facing exam experience beside reviewer/proctor intelligence. "
+            "Production candidates would not see reviewer dashboards, CIE internals, risk scores, or policy rules."
+        )
+        left, right = st.columns(2, gap="large")
+        with left:
+            render_candidate_exam_demo_view(session_id, candidate_id)
+        with right:
+            render_reviewer_proctor_demo_view(session_id, candidate_id, role)
 
 
 def build_demo_event(
@@ -3070,6 +3337,7 @@ def monitoring_panel(role: str, session_id: str | None) -> None:
     if not session_id:
         st.info("Start or select a session to generate monitoring events.")
         return
+    viva_split_screen_demo_panel(role, session_id, candidate_id)
     viva_scenario_validation_panel(role, session_id, candidate_id)
     contextual_intelligence_panel(role, session_id, candidate_id)
     camera_stream_foundation_panel(role, session_id, candidate_id)

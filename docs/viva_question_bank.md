@@ -145,44 +145,49 @@ No. It emits evidence events only. CIE and human review handle contextual interp
 41. **What does live dual-camera validation prove?**  
 It proves that two physical cameras can be discovered, selected, sampled, displayed, and converted into structured camera events without auto-activating on page load.
 
+42. **Does live camera validation feed the AI evidence pipeline?**  
+Yes. Explicitly sampled live frames can be encoded, passed into the visual detector layer, converted into structured EvidenceEvents, and ingested by the CIE.
+
+43. **Why include Viva Split-Screen Demonstration Mode?**  
+It helps the panel see the separation between candidate-facing exam experience and reviewer/proctor intelligence, while making clear that production candidates would not see the reviewer dashboard.
+
 ## Audio Intelligence
 
-42. **What audio intelligence is currently supported?**  
+44. **What audio intelligence is currently supported?**  
 The prototype includes structured audio event generation for background speech, prolonged speech, silence, environmental noise, and suspicious audio patterns.
 
-43. **Is continuous audio analysis production-grade?**  
+45. **Is continuous audio analysis production-grade?**  
 No. The modular design allows future Whisper, Silero VAD, or WebRTC VAD integration.
 
 ## Streamlit and FastAPI
 
-44. **Why use Streamlit?**  
+46. **Why use Streamlit?**  
 Streamlit is suitable for a capstone dashboard, rapid viva demonstration, controlled workflows, and local reproducibility.
 
-45. **What is Streamlit not suitable for?**  
+47. **What is Streamlit not suitable for?**  
 It is not ideal for production-grade multi-user real-time WebRTC monitoring or long-running continuous AI inference.
 
-46. **Why include FastAPI?**  
+48. **Why include FastAPI?**  
 FastAPI provides an API/service boundary for structured event ingestion and future AI service integration.
 
-47. **Why not build React now?**  
+49. **Why not build React now?**  
 React/Next.js is a future production frontend direction. It is outside the current capstone scope.
 
 ## Privacy and NDPA
 
-48. **How does SERPS support privacy by design?**  
+50. **How does SERPS support privacy by design?**  
 Cameras do not activate on page load, evidence is structured and auditable, candidate-facing messages avoid accusation, and human review remains final.
 
-49. **How does SERPS relate to NDPA concerns?**  
+51. **How does SERPS relate to NDPA concerns?**  
 It demonstrates data minimisation, consent capture, auditability, explainability, and controlled evidence handling, although full legal compliance would require institutional deployment review.
 
 ## Limitations and Future Work
 
-50. **What are the main prototype limitations?**  
+52. **What are the main prototype limitations?**  
 Continuous live monitoring is not fully production-grade, SQLite is local, some AI modules are simulation or user-triggered, and cloud deployment is secondary.
 
-51. **What would you improve after submission?**  
+53. **What would you improve after submission?**  
 I would implement React/Next.js frontends, FastAPI inference workers, PostgreSQL persistence, WebRTC streaming, stronger AI models, and institutional integrations.
 
-52. **What is the most important future research direction?**  
+54. **What is the most important future research direction?**  
 Strengthening live AI perception while preserving the governance pipeline: detection modules produce evidence, CIE reasons, IPIME applies process, and humans decide.
-

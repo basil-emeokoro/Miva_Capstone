@@ -4,6 +4,7 @@ from src.camera.live_camera_validator import (
     capture_live_camera_sample,
     discover_physical_cameras,
     live_camera_event,
+    sample_frame_to_jpeg_bytes,
 )
 from src.contextual_intelligence.contextual_intelligence_engine import ContextualIntelligenceEngine
 
@@ -92,3 +93,20 @@ def test_live_camera_event_can_enter_cie_pipeline() -> None:
     assert alert is not None
     assert event.event_id in alert.contributing_events
     assert "primary_camera" in alert.contributing_modules
+
+
+def test_sample_frame_to_jpeg_bytes_encodes_detector_input() -> None:
+    frame = np.zeros((100, 120, 3), dtype=np.uint8)
+    frame[:, :, 1] = 180
+
+    sample = capture_live_camera_sample(
+        0,
+        "primary",
+        sample_frames=1,
+        capture_factory=lambda index, backend: FakeCapture(opened=True, frame=frame, fps=20.0),
+    )
+
+    encoded = sample_frame_to_jpeg_bytes(sample)
+
+    assert encoded is not None
+    assert encoded[:2] == b"\xff\xd8"
