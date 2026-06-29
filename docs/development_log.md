@@ -250,3 +250,11 @@
 - Optional secondary object detection remains guarded behind an explicit control and continues gracefully if the local YOLO adapter/model is unavailable.
 - Manual demonstration/simulation controls remain available and labelled as fallback controls for viva reliability.
 - The architecture remains unchanged: hardware and detectors produce structured evidence only; CIE reasons over evidence; Agentic Decision Support recommends; IPIME applies procedure; human reviewers decide.
+
+## Candidate-Facing Phone Policy Response
+
+- Added candidate-facing primary-camera phone evidence types: `candidate_facing_phone_detected`, `phone_towards_screen_detected`, `possible_screen_capture_attempt`, and `repeated_phone_visibility`.
+- Primary-camera YOLO phone detections are mapped to candidate-facing phone evidence, while secondary-camera detections remain room-facing `mobile_phone_detected` evidence.
+- Extended institutional policy-as-code with configurable candidate-facing phone actions, including temporary screen shield, acknowledgement, warning, escalation, and review routing depending on institution and event type.
+- Added a prototype screen shield to the candidate Test Player and viva split-screen candidate view. The shield protects exam content only when IPIME policy actions require it and uses due-process wording.
+- The pipeline remains unchanged: detector evidence -> CIE -> Agentic Decision Support -> IPIME -> optional screen shield/acknowledgement -> Human Reviewer -> Report.

@@ -101,6 +101,7 @@ pip install ultralytics mediapipe
 - The Monitoring page exposes primary and secondary camera slots without activating camera hardware.
 - Monitoring includes an active/reporting session selector, monitoring-mode display, primary/secondary selectors, requirement cards, readiness status cards, and manual readiness/missing/disconnected event hooks.
 - The live dual-camera validation panel can explicitly sample selected physical cameras, display labelled Primary/Secondary frames, record FPS/resolution/status, and pass sampled frames into detector modules.
+- The primary candidate-facing camera can emit distinct phone-related evidence such as `candidate_facing_phone_detected`, while the secondary room-facing camera continues to emit environment/object evidence such as `mobile_phone_detected`.
 - Camera readiness and health events are persisted through the same SQLite `events` table used by visual, audio, identity, and behavioural events.
 - Camera events use the common evidence-event schema and are ready for Contextual Intelligence Engine ingestion.
 - Streamlit remains the UI/control shell for dashboards, manual prototype hooks, review, and report preview. It is not the real monitoring engine.
@@ -121,7 +122,8 @@ pip install ultralytics mediapipe
 - Visual detectors remain perception-only and emit `EvidenceEvent` objects for CIE ingestion.
 - OpenCV provides the current local face/camera obstruction analysis.
 - MediaPipe and YOLO are treated as optional live-AI adapters. They are not loaded on page startup and must be invoked behind user-triggered controls or service workers.
-- Optional YOLO evidence mapping now supports mobile phone, laptop/tablet, book/document, headphones/earpiece, and suspicious handheld-object signals. Newer YOLO models can be substituted through the object-detection configuration without changing the event schema.
+- Optional YOLO evidence mapping now supports mobile phone, candidate-facing phone, laptop/tablet, book/document, headphones/earpiece, and suspicious handheld-object signals. Newer YOLO models can be substituted through the object-detection configuration without changing the event schema.
+- Candidate-facing phone evidence is not an automatic malpractice finding. It is routed through CIE, Agentic Decision Support, IPIME, candidate acknowledgement where configured, and human review.
 - Audio intelligence now defines structured events for voice activity, background speech, prolonged speech, abnormal silence, environmental noise, and suspicious audio patterns. Whisper, WebRTC VAD, Silero VAD, or equivalent detectors can be substituted later without changing the CIE contract.
 - Identity assurance now emits structured evidence for periodic verification, low confidence, face mismatch, unknown face, and candidate substitution signals. These are evidence inputs only and do not bypass CIE reasoning.
 - `src/services/event_api.py` introduces a FastAPI structured-event API boundary so future camera/audio workers, secure exam players, or edge services can submit events without coupling inference to Streamlit.
@@ -129,6 +131,13 @@ pip install ultralytics mediapipe
 - Streamlit remains an operations dashboard and demo control surface. It is not the monitoring engine.
 - Monitoring supports both Live AI mode and Demonstration/Simulation mode. Live AI mode is currently user-triggered through still-frame upload and audio feature windows; continuous camera/audio monitoring remains a backend service responsibility.
 - Live dual-camera validation now bridges sampled frames into the same perception pipeline: physical camera sample -> frame encoding -> detector analysis -> `EvidenceEvent` -> CIE ingestion. Simulation controls remain available and clearly labelled for viva stability.
+
+## Candidate-Facing Phone Policy Response
+
+- SERPS distinguishes a phone seen by the candidate-facing primary camera from a phone seen by the room-facing secondary camera.
+- Candidate-facing phone evidence can represent a different risk pattern, such as a phone raised toward the screen or a possible screen-capture attempt.
+- IPIME policy-as-code can configure responses such as record-only, warning banner, temporary screen shield, candidate acknowledgement, reviewer escalation, or session-suspension recommendation.
+- The temporary screen shield protects exam content using due-process wording. It does not state that the candidate committed malpractice and does not bypass human review.
 
 ## Contextual Intelligence Engine
 

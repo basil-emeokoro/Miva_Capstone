@@ -29,6 +29,7 @@ class InstitutionalPolicyRule:
     notify_role: str
     preserve_evidence: bool
     candidate_message: str
+    event_type_actions: dict[str, list[str]] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "InstitutionalPolicyRule":
@@ -43,6 +44,10 @@ class InstitutionalPolicyRule:
             notify_role=str(data.get("notify_role", "Reviewer")),
             preserve_evidence=bool(data.get("preserve_evidence", True)),
             candidate_message=_safe_candidate_message(str(data.get("candidate_message", SAFE_DUE_PROCESS_MESSAGE))),
+            event_type_actions={
+                str(event_type): [str(action) for action in actions]
+                for event_type, actions in dict(data.get("event_type_actions", {})).items()
+            },
         )
 
 
@@ -107,7 +112,11 @@ def evaluate_institutional_policy(
     resolved_profile = normalize_institution_profile(institution_profile)
     risk_level = str(alert.get("risk_level") or "Low")
     selected_rule = select_policy_rule(resolved_profile, risk_level, rules or load_policy_rules())
-    status = "awaiting_candidate_acknowledgement" if selected_rule.require_acknowledgement else "policy_action_recorded"
+    recommended_actions = _merge_policy_event_actions(selected_rule, _extract_event_types(alert))
+    pause_assessment = selected_rule.pause_assessment or "pause_exam_timer" in recommended_actions
+    require_acknowledgement = selected_rule.require_acknowledgement or "require_candidate_acknowledgement" in recommended_actions
+    candidate_message = _candidate_message_for_actions(selected_rule.candidate_message, recommended_actions)
+    status = "awaiting_candidate_acknowledgement" if require_acknowledgement else "policy_action_recorded"
     return PolicyDecision(
         policy_id=selected_rule.policy_id,
         institution_profile=resolved_profile,
@@ -117,12 +126,12 @@ def evaluate_institutional_policy(
         risk_level=risk_level,
         agent_priority=agent_priority,
         agent_actions=agent_actions or [],
-        recommended_actions=selected_rule.recommended_actions,
-        pause_assessment=selected_rule.pause_assessment,
-        require_acknowledgement=selected_rule.require_acknowledgement,
+        recommended_actions=recommended_actions,
+        pause_assessment=pause_assessment,
+        require_acknowledgement=require_acknowledgement,
         notify_role=selected_rule.notify_role,
         preserve_evidence=selected_rule.preserve_evidence,
-        candidate_message=selected_rule.candidate_message,
+        candidate_message=candidate_message,
         workflow_label=selected_rule.workflow_label,
         status=status,
     )
@@ -167,3 +176,36 @@ def _safe_candidate_message(message: str) -> str:
     if any(phrase in lowered for phrase in forbidden):
         return SAFE_DUE_PROCESS_MESSAGE
     return message
+
+
+def _extract_event_types(alert: dict[str, object]) -> list[str]:
+    value = alert.get("contributing_event_types") or alert.get("event_types")
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return [value]
+        if isinstance(decoded, list):
+            return [str(item) for item in decoded]
+    return []
+
+
+def _merge_policy_event_actions(rule: InstitutionalPolicyRule, event_types: list[str]) -> list[str]:
+    actions = list(rule.recommended_actions)
+    for event_type in event_types:
+        for action in rule.event_type_actions.get(event_type, []):
+            if action not in actions:
+                actions.append(action)
+    return actions
+
+
+def _candidate_message_for_actions(base_message: str, actions: list[str]) -> str:
+    if "activate_temporary_screen_shield" not in actions:
+        return base_message
+    return _safe_candidate_message(
+        "A potential examination integrity concern has been detected. Exam content is temporarily protected "
+        "while the system records the event for authorised review. Please provide your explanation if requested "
+        "by institutional policy."
+    )

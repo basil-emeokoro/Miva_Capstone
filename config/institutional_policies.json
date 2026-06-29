@@ -17,7 +17,31 @@
       "require_acknowledgement": true,
       "notify_role": "Reviewer",
       "preserve_evidence": true,
-      "candidate_message": "A potential examination integrity concern has been detected. Please provide your explanation. Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
+      "candidate_message": "A potential examination integrity concern has been detected. Please provide your explanation. Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made.",
+      "event_type_actions": {
+        "candidate_facing_phone_detected": [
+          "activate_temporary_screen_shield",
+          "require_candidate_acknowledgement",
+          "escalate_to_reviewer"
+        ],
+        "phone_towards_screen_detected": [
+          "activate_temporary_screen_shield",
+          "pause_exam_timer",
+          "require_candidate_acknowledgement",
+          "escalate_to_reviewer"
+        ],
+        "possible_screen_capture_attempt": [
+          "activate_temporary_screen_shield",
+          "pause_exam_timer",
+          "require_candidate_acknowledgement",
+          "notify_reviewer"
+        ],
+        "repeated_phone_visibility": [
+          "activate_temporary_screen_shield",
+          "require_candidate_acknowledgement",
+          "flag_for_review"
+        ]
+      }
     },
     {
       "policy_id": "university_medium_risk_warning_review",
@@ -34,7 +58,27 @@
       "require_acknowledgement": false,
       "notify_role": "Reviewer",
       "preserve_evidence": true,
-      "candidate_message": "A potential examination integrity concern has been logged for review. Please continue the assessment and follow all examination instructions."
+      "candidate_message": "A potential examination integrity concern has been logged for review. Please continue the assessment and follow all examination instructions.",
+      "event_type_actions": {
+        "candidate_facing_phone_detected": [
+          "display_warning",
+          "flag_for_later_review"
+        ],
+        "phone_towards_screen_detected": [
+          "activate_temporary_screen_shield",
+          "require_candidate_acknowledgement",
+          "flag_for_later_review"
+        ],
+        "possible_screen_capture_attempt": [
+          "activate_temporary_screen_shield",
+          "require_candidate_acknowledgement",
+          "notify_reviewer"
+        ],
+        "repeated_phone_visibility": [
+          "display_warning",
+          "flag_for_later_review"
+        ]
+      }
     },
     {
       "policy_id": "generic_critical_risk_senior_review",
@@ -51,7 +95,31 @@
       "require_acknowledgement": true,
       "notify_role": "Senior Reviewer",
       "preserve_evidence": true,
-      "candidate_message": "A potential examination integrity concern has been detected. Please provide your explanation. Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
+      "candidate_message": "A potential examination integrity concern has been detected. Please provide your explanation. Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made.",
+      "event_type_actions": {
+        "candidate_facing_phone_detected": [
+          "activate_temporary_screen_shield",
+          "require_candidate_acknowledgement",
+          "notify_senior_reviewer"
+        ],
+        "phone_towards_screen_detected": [
+          "activate_temporary_screen_shield",
+          "pause_exam_timer",
+          "require_candidate_acknowledgement",
+          "notify_senior_reviewer"
+        ],
+        "possible_screen_capture_attempt": [
+          "activate_temporary_screen_shield",
+          "pause_exam_timer",
+          "require_candidate_acknowledgement",
+          "preserve_evidence"
+        ],
+        "repeated_phone_visibility": [
+          "activate_temporary_screen_shield",
+          "require_candidate_acknowledgement",
+          "await_human_review"
+        ]
+      }
     },
     {
       "policy_id": "generic_low_medium_observe",

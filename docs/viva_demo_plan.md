@@ -130,6 +130,8 @@ Implemented live in the current capstone prototype:
 - Monitoring Mode Controller for Mode A, Mode B, and Mode C.
 - Controlled physical dual-camera discovery, primary/secondary selection, labelled preview sampling, FPS/resolution/status display, and stream-health evidence generation.
 - Explicit sampled-frame handoff from live camera validation into visual detector modules where feasible.
+- Candidate-facing primary-camera phone evidence, distinct from room-facing secondary-camera object evidence.
+- IPIME-configurable temporary screen shield for candidate-facing phone or possible screen-capture risk, using due-process wording and preserving human review.
 - Structured evidence event generation and SQLite persistence.
 - Computer vision, audio, identity, camera/system event foundations.
 - Contextual Intelligence Engine with temporal memory, risk scoring, contextual reasoning, and explainability.
@@ -142,7 +144,7 @@ Prototype or simulated in the current capstone:
 
 - Some monitoring evidence is generated through controlled demo hooks or scenario runners.
 - Continuous real-time browser video/audio processing is not fully production-grade in Streamlit; current live camera validation is explicit sampled validation rather than always-on streaming.
-- Object detection and identity assurance are modular foundations rather than full enterprise deployments.
+- Object detection and identity assurance are modular foundations rather than full enterprise deployments. Candidate-facing phone detection is a structured evidence signal and should not be presented as an automatic malpractice finding.
 - Cloud deployment is optional and secondary, not the primary examination environment.
 
 Future enhancement:

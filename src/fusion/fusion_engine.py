@@ -311,6 +311,10 @@ def _normalize_event_type(event_type: str) -> str:
         "camera_stream_restored": "camera_ready",
         "camera_stream_disconnected": "camera_disconnected",
         "camera_stream_missing": "camera_missing",
+        "candidate_facing_phone_detected": "mobile_phone_detected",
+        "phone_towards_screen_detected": "mobile_phone_detected",
+        "possible_screen_capture_attempt": "mobile_phone_detected",
+        "repeated_phone_visibility": "mobile_phone_detected",
     }
     return aliases.get(event_type, event_type)
 

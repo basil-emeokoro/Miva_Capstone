@@ -191,3 +191,12 @@ I would implement React/Next.js frontends, FastAPI inference workers, PostgreSQL
 
 54. **What is the most important future research direction?**  
 Strengthening live AI perception while preserving the governance pipeline: detection modules produce evidence, CIE reasons, IPIME applies process, and humans decide.
+
+55. **Why distinguish candidate-facing phone evidence from room-facing phone evidence?**  
+A phone visible in the primary candidate-facing camera may indicate a different pattern, such as being raised toward the exam screen, while a phone visible in the secondary room view is broader environmental context. SERPS keeps these as separate structured evidence types so CIE/IPIME can reason and apply policy appropriately.
+
+56. **Does the screen shield mean the system has found malpractice?**  
+No. The screen shield is a configurable institutional protection workflow. It temporarily protects exam content while evidence and any candidate explanation are preserved for authorised human review.
+
+57. **Can institutions choose different responses to candidate-facing phone evidence?**  
+Yes. IPIME policy-as-code can configure no action, warning, acknowledgement, screen shielding, escalation, or suspension recommendation. The policy controls the workflow; human reviewers remain responsible for final decisions.

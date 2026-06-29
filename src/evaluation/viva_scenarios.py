@@ -266,8 +266,10 @@ def execute_viva_scenario(
     save_alert(alert)
 
     orchestrated = AgenticOrchestrator().plan_actions(alert)
+    policy_alert = alert.to_dict()
+    policy_alert["contributing_event_types"] = [event.event_type for event in generated_events]
     decision = evaluate_institutional_policy(
-        alert.to_dict(),
+        policy_alert,
         policy_profile or scenario.policy_profile,
         agent_actions=orchestrated.actions,
         agent_priority=orchestrated.priority,

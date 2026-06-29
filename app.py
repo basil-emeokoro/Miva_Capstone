@@ -1904,7 +1904,11 @@ def render_candidate_incident_acknowledgement_panel(session: dict[str, object]) 
     decision = pending_decisions[0]
     package = build_evidence_package(str(decision["decision_id"]))
     alert = package.get("contextual_risk_assessment") or {}
-    st.warning("The mock assessment is paused for an institutional incident acknowledgement workflow.")
+    shield_active = policy_requires_screen_shield(decision)
+    if shield_active:
+        render_screen_shield_notice(decision, session_id)
+    else:
+        st.warning("The mock assessment is paused for an institutional incident acknowledgement workflow.")
     with st.container(border=True):
         st.markdown("#### Candidate Incident Acknowledgement")
         st.info(str(decision.get("candidate_message")))
@@ -2284,10 +2288,19 @@ def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: 
             key=f"live_camera_run_detectors_{session_id}",
             help="When enabled, sampled frames are encoded and passed to the visual detector layer to create structured evidence events.",
         )
-        run_secondary_objects = st.checkbox(
-            "Attempt secondary object detection / YOLO adapter if available",
+        run_primary_objects = st.checkbox(
+            "Attempt candidate-facing phone detection on primary camera",
             value=False,
-            key=f"live_camera_run_yolo_{session_id}",
+            key=f"live_camera_run_primary_yolo_{session_id}",
+            help=(
+                "Optional. If YOLO is available, primary-camera phone evidence is emitted as "
+                "candidate-facing structured evidence for CIE/IPIME review."
+            ),
+        )
+        run_secondary_objects = st.checkbox(
+            "Attempt room-facing object detection on secondary camera",
+            value=False,
+            key=f"live_camera_run_secondary_yolo_{session_id}",
             help="Optional. If the local YOLO adapter/model is unavailable, SERPS records detector notes and continues without failing the demo.",
         )
 
@@ -2317,7 +2330,10 @@ def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: 
                                 candidate_id=candidate_id,
                                 sample=sample,
                                 role=role,
-                                run_object_detection=sample.role == "secondary" and run_secondary_objects,
+                                run_object_detection=(
+                                    (sample.role == "primary" and run_primary_objects)
+                                    or (sample.role == "secondary" and run_secondary_objects)
+                                ),
                             )
                         )
                     else:
@@ -2496,6 +2512,10 @@ EVENT_DISPLAY_NAMES = {
     "environmental_noise": "Environmental Noise",
     "suspicious_audio_pattern": "Suspicious Audio Pattern",
     "mobile_phone_detected": "Mobile Phone Detected",
+    "candidate_facing_phone_detected": "Candidate-Facing Phone Detected",
+    "phone_towards_screen_detected": "Phone Toward Screen Detected",
+    "possible_screen_capture_attempt": "Possible Screen Capture Attempt",
+    "repeated_phone_visibility": "Repeated Phone Visibility",
     "laptop_or_tablet_detected": "Laptop or Tablet Detected",
     "book_or_document_detected": "Book or Document Detected",
     "headphones_or_earpiece_detected": "Headphones or Earpiece Detected",
@@ -2620,6 +2640,13 @@ def event_group_name(event: dict[str, object]) -> str:
         return "Camera Health"
     if source_module == "audio":
         return "Audio Intelligence"
+    if event_type in {
+        "candidate_facing_phone_detected",
+        "phone_towards_screen_detected",
+        "possible_screen_capture_attempt",
+        "repeated_phone_visibility",
+    }:
+        return "Candidate-Facing Phone Risk"
     if event_type in {"mobile_phone_detected", "unauthorised_object_detected"}:
         return "Object Detection"
     if source_module in {"primary_camera", "secondary_camera"}:
@@ -2707,6 +2734,50 @@ def pending_candidate_incident_decision(session_id: str) -> dict[str, object] | 
     return None
 
 
+SCREEN_SHIELD_ACTIONS = {
+    "activate_temporary_screen_shield",
+    "protect_exam_content",
+}
+
+
+def policy_requires_screen_shield(decision: dict[str, object] | None) -> bool:
+    if not decision:
+        return False
+    actions = set(ensure_list(decision.get("recommended_actions")))
+    return bool(actions & SCREEN_SHIELD_ACTIONS)
+
+
+def enriched_alert_for_policy(alert: dict[str, object]) -> dict[str, object]:
+    enriched = dict(alert)
+    event_ids = set(ensure_list(alert.get("contributing_events")))
+    if event_ids:
+        event_types = [
+            str(event.get("event_type"))
+            for event in cached_events(str(alert.get("session_id")))
+            if str(event.get("event_id")) in event_ids
+        ]
+        enriched["contributing_event_types"] = event_types
+    return enriched
+
+
+def render_screen_shield_notice(decision: dict[str, object], session_id: str) -> None:
+    st.error("Temporary Exam Content Protection")
+    st.warning(
+        "A potential examination integrity concern has been detected. Exam content is temporarily protected "
+        "while the system records the event for authorised review."
+    )
+    col_time, col_concern, col_status = st.columns(3)
+    with col_time:
+        st.metric("Incident time", str(decision.get("created_at", ""))[:19])
+    with col_concern:
+        st.metric("Concern type", str(decision.get("risk_level", "Review")))
+    with col_status:
+        st.metric("Exam content", "Protected")
+    st.caption(
+        f"Session {session_id}. This is a policy-controlled protection workflow, not a misconduct decision."
+    )
+
+
 def render_candidate_exam_demo_view(session_id: str, candidate_id: str) -> None:
     candidate = get_candidate(candidate_id) or {}
     questions = load_sample_questions()
@@ -2732,11 +2803,14 @@ def render_candidate_exam_demo_view(session_id: str, candidate_id: str) -> None:
         with col_timer:
             st.metric("Timer", "24:18")
         if incident_decision:
-            st.warning("Assessment paused: incident acknowledgement required.")
-            st.info(
-                "A potential examination integrity concern has been detected. Please provide your explanation. "
-                "Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
-            )
+            if policy_requires_screen_shield(incident_decision):
+                render_screen_shield_notice(incident_decision, session_id)
+            else:
+                st.warning("Assessment paused: incident acknowledgement required.")
+                st.info(
+                    "A potential examination integrity concern has been detected. Please provide your explanation. "
+                    "Your response and the associated evidence will be reviewed by an authorised examination official before any determination is made."
+                )
             with st.form(f"split_candidate_ack_{incident_decision['decision_id']}"):
                 explanation = st.text_area("Candidate explanation")
                 acknowledged = st.checkbox("I acknowledge that my explanation will be reviewed by an authorised examination official.")
@@ -3500,8 +3574,9 @@ def render_ipime_review_panel(role: str, alert: dict[str, object]) -> None:
     candidate_id = str(alert["candidate_id"])
     institution_profile = institution_profile_for_candidate(candidate_id)
     orchestrated = AgenticOrchestrator().plan_actions(fused_alert_from_row(alert))
+    policy_alert = enriched_alert_for_policy(alert)
     policy_preview = evaluate_institutional_policy(
-        alert,
+        policy_alert,
         institution_profile,
         agent_actions=orchestrated.actions,
         agent_priority=orchestrated.priority,

@@ -100,6 +100,43 @@ VISUAL_EVENT_DEFINITIONS: dict[str, VisualEventDefinition] = {
         "secondary",
         "Mobile phone detected in the environment view.",
     ),
+    "candidate_facing_phone_detected": VisualEventDefinition(
+        "Candidate-facing phone detected",
+        "primary_camera",
+        "candidate_facing_phone_detected",
+        0.78,
+        0.86,
+        "primary",
+        "Mobile phone detected in the candidate-facing camera view.",
+        prototype_only=False,
+    ),
+    "phone_towards_screen_detected": VisualEventDefinition(
+        "Phone towards screen detected",
+        "primary_camera",
+        "phone_towards_screen_detected",
+        0.82,
+        0.8,
+        "primary",
+        "Phone-like object appears raised toward the screen direction.",
+    ),
+    "possible_screen_capture_attempt": VisualEventDefinition(
+        "Possible screen capture attempt",
+        "primary_camera",
+        "possible_screen_capture_attempt",
+        0.86,
+        0.78,
+        "primary",
+        "Candidate-facing phone evidence suggests a possible screen-capture attempt.",
+    ),
+    "repeated_phone_visibility": VisualEventDefinition(
+        "Repeated phone visibility",
+        "primary_camera",
+        "repeated_phone_visibility",
+        0.74,
+        0.82,
+        "primary",
+        "Phone-like object repeatedly appeared in the candidate-facing camera view.",
+    ),
     "unauthorised_object_detected": VisualEventDefinition(
         "Unauthorised object detected",
         "secondary_camera",
@@ -233,20 +270,33 @@ def create_events_from_frame_analysis(
             if not result.available:
                 notes.append(result.description)
                 continue
-            if result.event_type in VISUAL_EVENT_DEFINITIONS:
+            event_type = _camera_specific_object_event_type(result.event_type, camera_id)
+            if event_type in VISUAL_EVENT_DEFINITIONS:
+                description = result.description
+                if event_type == "candidate_facing_phone_detected":
+                    description = (
+                        "YOLO detected a possible mobile phone in the candidate-facing primary camera view. "
+                        "This is structured evidence for CIE/IPIME review, not a misconduct decision."
+                    )
                 events.append(
                     create_visual_event(
                         session_id=session_id,
                         candidate_id=candidate_id,
-                        event_type=result.event_type,
+                        event_type=event_type,
                         camera_id=camera_id,
                         confidence=result.confidence,
-                        description=result.description,
+                        description=description,
                         evidence_path=evidence_path,
                     )
                 )
                 notes.append(f"{result.model_name}: {result.description}")
     return VisualFrameAnalysis(events=events, detector_notes=notes)
+
+
+def _camera_specific_object_event_type(event_type: str, camera_id: str) -> str:
+    if camera_id == "primary" and event_type == "mobile_phone_detected":
+        return "candidate_facing_phone_detected"
+    return event_type
 
 
 def _head_pose_event(
