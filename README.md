@@ -164,6 +164,19 @@ Addenda 3 and 4 elevate the previous Event Fusion Engine into a broader Contextu
 - Reports include a Viva Scenario Validation Summary table with expected risk, actual risk, expected policy response, actual policy response, pass/needs-review status, acknowledgement state, reviewer state, and final outcome status.
 - These scenarios are controlled validation cases for demonstration and dissertation evaluation. They are not production cheating labels and do not replace authorised human review.
 
+## Live Dual-Camera Validation
+
+Monitoring includes a controlled live dual-camera capability test for local viva validation.
+
+- Physical cameras are discovered only after the user clicks the discovery control.
+- Primary and secondary cameras can be selected from OpenCV-detected devices.
+- The selected cameras can be sampled side by side with Primary Camera and Secondary Camera labels.
+- SERPS displays connection status, FPS, and resolution for each selected stream.
+- Readiness or disconnection results are saved as structured `EvidenceEvent` records and passed to the CIE.
+- Cameras never activate on page load and are released after each validation sample.
+
+This is a capstone validation of the dual-camera design. Continuous production streaming should be implemented later with a service-based WebRTC/OpenCV/FastAPI architecture.
+
 ## Documentation Automation Framework
 
 SERPS now includes a foundation for automated dissertation artefact generation. The implementation remains the source of truth for generated figures, API evidence, scenario catalogs, captions, and manifests.

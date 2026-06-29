@@ -203,7 +203,7 @@
 
 ## Documentation Automation Framework Sprint 1
 
-- Added a documentation automation foundation that makes SERPS a self-documenting research platform without changing the frozen architecture.
+- Added a documentation automation foundation that supports SERPS as a capstone prototype with reproducible dissertation artefacts, without changing the frozen architecture.
 - Added `scripts/docs/package_dissertation_assets.py` as the single command for rebuilding implementation-derived dissertation artefacts.
 - Created `docs/dissertation/` with Chapter Three, Chapter Four, Chapter Five, captions, and manifest output areas.
 - Generated editable Mermaid sources for high-level architecture, layered architecture, system workflow, use case, activity, sequence, ERD, system flowchart, and API interaction model.
@@ -230,3 +230,12 @@
 - Added a grouped asset index and richer manifest metadata including chapter, figure, description, environment, and package metadata.
 - Added `docs/dissertation/dissertation_assets.zip` packaging for generated dissertation artefacts.
 - Expanded pytest coverage to verify the package, asset index, OpenAPI summary, screenshot plan, scenario summary, chart output, and manifest package checksum.
+
+## Viva Demonstration and Live Dual-Camera Validation
+
+- Added `docs/viva_demo_plan.md` with remote viva demonstration guidance, opening statement, architecture defence, research contributions, limitation boundaries, fallback plan, and production frontend roadmap.
+- Added `docs/viva_question_bank.md` with grouped viva questions and concise model answers across motivation, literature, methodology, architecture, CIE, explainability, Agentic AI, IPIME, identity, vision, audio, Streamlit, FastAPI, privacy, limitations, and future work.
+- Added a controlled OpenCV live dual-camera validation module in `src/camera/live_camera_validator.py`.
+- Monitoring now includes an explicit live dual-camera capability test: physical camera discovery, primary/secondary selection, side-by-side labelled frame previews, FPS/resolution/status display, and structured camera events that feed the existing CIE.
+- The privacy rule remains intact: physical cameras are not opened on page load; discovery and validation require explicit user action and release selected devices after sampling.
+- Added pytest coverage using fake camera captures so live camera validation logic remains testable without hardware in CI.

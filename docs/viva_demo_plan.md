@@ -8,6 +8,70 @@ It should be presented as the Miva Open University MIT capstone implementation o
 
 SERPS should not be described as being converted into a general research platform. The current focus remains the capstone implementation, viva demonstration, dissertation evidence generation, and reproducible technical artefacts.
 
+## Viva Opening Statement
+
+Good day. My dissertation is titled **Secure Explainable Remote Proctoring System for AI-Assisted Examination Integrity Monitoring**. The implemented prototype is SERPS, the Secure Explainable Remote Proctoring System.
+
+The motivation for this work is the growth of remote and computer-based assessments, where institutions need credible ways to support examination integrity without relying on opaque AI decisions or intrusive one-dimensional monitoring. Existing proctoring tools often focus on isolated camera or audio signals, but examination incidents usually require context: what happened, when it happened, how often it happened, which modality observed it, and whether the evidence is strong enough for human review.
+
+The research problem addressed by SERPS is how to design a privacy-aware, explainable, multimodal proctoring prototype that can convert monitoring signals into structured evidence, reason over them contextually, and support institutional review without making automatic misconduct decisions.
+
+The main architectural contribution is the Contextual Intelligence Engine, supported by temporal behavioural memory, explainability, Agentic Decision Support, and the Institutional Policy & Incident Management Engine. Together, these components demonstrate a governance pipeline rather than a raw video cheating classifier.
+
+In the demonstration, I will first show the dashboard and role simulator, then demonstrate enrolment and session preparation where relevant. I will then run selected viva scenarios to show how evidence events flow through the CIE, how risk and explanations are generated, how IPIME applies institutional procedure, how candidate acknowledgement works where required, and how the final decision remains with the human reviewer.
+
+## Architecture Defence
+
+SERPS follows the frozen Version 1.0 decision pipeline:
+
+Sensor Layer
+
+↓
+
+Detection Modules
+
+↓
+
+Structured Evidence Events
+
+↓
+
+Contextual Intelligence Engine (CIE)
+
+↓
+
+Agentic Decision Support
+
+↓
+
+Institutional Policy & Incident Management Engine (IPIME)
+
+↓
+
+Candidate Acknowledgement, where policy requires
+
+↓
+
+Human Reviewer
+
+↓
+
+Final Institutional Decision
+
+The Sensor Layer captures potential inputs such as camera, audio, identity, device, and session signals. Detection modules interpret those inputs only as observable evidence. They do not decide whether misconduct occurred.
+
+Structured Evidence Events create a consistent evidence format across modalities. This prevents camera, audio, identity, and system-health modules from becoming isolated systems. Every event can be persisted, audited, correlated, explained, and reported.
+
+The CIE is the only reasoning layer. No detection module bypasses it because isolated perception signals are insufficient for institutional action. For example, a single looking-away event should not be treated the same as repeated gaze deviation combined with background speech and mobile phone detection. The CIE evaluates temporal proximity, frequency, confidence, source module, risk weight, and behavioural persistence.
+
+Agentic Decision Support receives CIE output and recommends operational action, such as observe, warn, escalate, or request review. It does not determine guilt.
+
+IPIME translates CIE and Agent outputs into institution-specific process. This is necessary because WAEC, universities, and other institutions may use different procedural responses for similar risk levels. IPIME determines workflow, not disciplinary outcome.
+
+Candidate acknowledgement is included where institutional policy requires due process. The candidate is informed that a potential examination integrity concern was detected and is asked to provide an explanation. The wording deliberately avoids accusing the candidate of malpractice.
+
+Human review remains final because SERPS is designed as human-centred decision support. Automatic misconduct decisions are avoided to preserve due process, reduce false-positive harm, support explainability, and align the system with institutional governance.
+
 ## Primary Remote Viva Demonstration Plan
 
 The recommended viva demonstration approach is to run SERPS locally and share the screen with the panel.
@@ -78,12 +142,46 @@ Prototype or simulated in the current capstone:
 Future enhancement:
 
 - Production WebRTC camera/audio streaming.
+- Dedicated live dual-camera service for continuous monitoring beyond the controlled validation panel.
 - React/Next.js candidate and proctor frontends.
 - FastAPI-hosted inference workers.
 - PostgreSQL or managed database persistence.
 - Scalable multi-user candidate/proctor separation.
 - Stronger live AI models for gaze, head pose, object detection, voice activity, and continuous identity assurance.
 - Institutional integrations and secure exam-browser integration.
+
+## Research Contributions
+
+SERPS makes the following capstone-level implementation contributions:
+
+- **Explainable multimodal remote proctoring architecture:** SERPS integrates camera, audio, identity, device, behavioural, and session evidence into a coherent governance workflow.
+- **Contextual Intelligence Engine:** The CIE centralises reasoning so detection modules remain perception-only and do not make misconduct decisions.
+- **Temporal behavioural memory:** SERPS distinguishes isolated events from persistent patterns by considering frequency and temporal windows.
+- **Contextual risk reasoning:** Risk is derived from confidence, modality, event frequency, temporal proximity, and correlated evidence rather than from a single raw detector output.
+- **Institutional Policy & Incident Management Engine:** IPIME translates contextual risk into configurable institutional procedure without determining guilt.
+- **Human-centred governance workflow:** Candidate acknowledgement, reviewer rationale, audit trail, and final human decision are built into the process.
+- **Documentation automation for reproducible dissertation artefacts:** SERPS generates implementation-derived diagrams, manifests, captions, OpenAPI evidence, scenario summaries, and packaged dissertation assets.
+
+## Limitations and Future Work
+
+Current prototype limitations:
+
+- Streamlit is effective for viva dashboard demonstration but is not a full production real-time proctoring frontend.
+- Some evidence events remain controlled simulations or user-triggered validations rather than continuous autonomous detection.
+- Live dual-camera validation is a controlled capability test. Continuous dual-camera proctoring should be moved to a service/WebRTC architecture in production.
+- SQLite is appropriate for local capstone demonstration but not for scalable multi-user deployment.
+- Camera and audio access depend on local device permissions and operating-system behaviour.
+- YOLO/object detection, continuous identity assurance, and audio intelligence are modular foundations that require further production hardening.
+
+Future production enhancements:
+
+- React/Next.js frontend for separate candidate, proctor, reviewer, and administrator experiences.
+- FastAPI background inference services for camera, audio, identity, and event ingestion.
+- WebRTC-based browser streaming for continuous low-latency monitoring.
+- PostgreSQL or another managed database for durable concurrent access.
+- Stronger AI models for gaze, head pose, object detection, face verification, speech detection, and environmental analysis.
+- Institutional integrations with CBT platforms, secure exam browsers, and official case-management systems.
+- Deployment hardening, authentication, encryption, audit retention, and NDPA-aligned privacy controls.
 
 ## React / Production Frontend Note
 
@@ -142,3 +240,20 @@ If live hardware, camera access, browser permissions, or network conditions fail
 4. Explain that the fallback mode is intentional: SERPS supports both Live AI Mode and Demonstration/Simulation Mode so viva evidence can be reproduced even when live hardware is unavailable.
 5. Emphasise that no camera opens on page load and that camera access is user-triggered for privacy-by-design reasons.
 
+## Live Dual-Camera Validation
+
+The Monitoring page includes a controlled live dual-camera capability test. This is a technical validation of the dual-camera architecture, not a new architectural feature.
+
+The validation supports:
+
+- explicit OpenCV camera discovery;
+- primary and secondary physical camera selection;
+- side-by-side labelled previews after user activation;
+- FPS, resolution, and connection status display;
+- structured camera readiness or disconnection events;
+- persistence through the common EvidenceEvent schema;
+- CIE ingestion of live camera health evidence.
+
+The privacy rule remains unchanged: physical cameras are never opened on page load. Discovery and validation require explicit user action, and selected devices are released after the validation sample is captured.
+
+If simultaneous continuous streaming becomes necessary beyond the controlled capstone validation, the recommended production path is a FastAPI/OpenCV/WebRTC service where Streamlit remains the operations dashboard and the backend service manages real-time streams.

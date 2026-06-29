@@ -25,6 +25,12 @@ from src.camera.camera_stream import (
     manual_camera_health_event,
     required_camera_roles,
 )
+from src.camera.live_camera_validator import (
+    LiveCameraSample,
+    capture_live_camera_sample,
+    discover_physical_cameras,
+    live_camera_event,
+)
 from src.enrolment.consent_manager import CONSENT_NOTICE, capture_consent
 from src.enrolment.face_enrolment import (
     FACE_DIRECTIONS,
@@ -2108,6 +2114,8 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
         else:
             st.info("Your role can view camera stream status but cannot generate camera events.")
 
+        live_dual_camera_validation_panel(role, session_id, candidate_id, mode)
+
         camera_events = [
             event
             for event in cached_events(session_id)
@@ -2119,6 +2127,129 @@ def camera_stream_foundation_panel(role: str, session_id: str, candidate_id: str
             st.dataframe(pd.DataFrame(camera_events), width="stretch", hide_index=True)
         else:
             st.info("No camera/system events have been recorded for this session yet.")
+
+
+def live_dual_camera_validation_panel(role: str, session_id: str, candidate_id: str, mode: str) -> None:
+    required_roles = required_camera_roles(mode)
+    state_key = f"live_camera_devices_{session_id}"
+    sample_key = f"live_camera_samples_{session_id}"
+
+    with st.expander("Live dual-camera capability test", expanded=False):
+        st.caption(
+            "This controlled validation opens physical cameras only after explicit user action. "
+            "Captured readiness/disconnection evidence is stored as structured events and passed to the CIE."
+        )
+        col_privacy, col_mode = st.columns(2)
+        with col_privacy:
+            st.info("Privacy rule: no physical camera is opened on page load.")
+        with col_mode:
+            requirement = "Primary + Secondary required" if "secondary" in required_roles else "Primary required; secondary optional"
+            st.info(f"Monitoring Mode {mode}: {requirement}.")
+
+        if not has_permission(role, "generate_demo_events"):
+            st.info("Your role can view live validation status but cannot activate physical camera validation.")
+            return
+
+        max_index = st.number_input(
+            "Maximum camera index to probe",
+            min_value=1,
+            max_value=10,
+            value=6,
+            step=1,
+            key=f"live_camera_max_index_{session_id}",
+            help="Camera discovery is user-triggered. Higher values take longer because OpenCV probes each index.",
+        )
+        if st.button("Detect connected physical cameras", key=f"detect_live_cameras_{session_id}"):
+            with st.spinner("Probing local camera indices..."):
+                devices = discover_physical_cameras(max_index=int(max_index))
+            st.session_state[state_key] = devices
+            if devices:
+                st.success(f"Detected {len(devices)} physical camera(s).")
+            else:
+                st.warning("No physical cameras were detected by OpenCV. Browser-managed Streamlit camera input may still be available.")
+
+        devices = st.session_state.get(state_key, [])
+        if not devices:
+            st.info("Click 'Detect connected physical cameras' to enumerate local OpenCV camera devices.")
+            return
+
+        device_options = {device.display_label: device for device in devices}
+        col_primary, col_secondary = st.columns(2)
+        with col_primary:
+            primary_label = st.selectbox("Primary physical camera", list(device_options), key=f"live_primary_select_{session_id}")
+        with col_secondary:
+            secondary_choices = list(device_options)
+            if "secondary" not in required_roles:
+                secondary_choices = ["Secondary not required for selected mode"] + secondary_choices
+            secondary_label = st.selectbox("Secondary physical camera", secondary_choices, key=f"live_secondary_select_{session_id}")
+
+        primary_device = device_options[primary_label]
+        secondary_device = None if secondary_label.startswith("Secondary not required") else device_options[secondary_label]
+        if secondary_device and primary_device.index == secondary_device.index:
+            st.warning("Primary and secondary selections point to the same physical camera. Select two different devices for a stronger Mode B validation.")
+
+        sample_frames = st.slider(
+            "Frames to sample per validation run",
+            min_value=3,
+            max_value=30,
+            value=12,
+            step=3,
+            key=f"live_camera_sample_frames_{session_id}",
+            help="SERPS opens the selected cameras briefly, samples frames, records status, then releases the devices.",
+        )
+        record_to_cie = st.checkbox(
+            "Persist live camera events and pass them to CIE",
+            value=True,
+            key=f"live_camera_record_events_{session_id}",
+        )
+
+        if st.button("Start / refresh live dual-camera validation", key=f"start_live_dual_camera_{session_id}"):
+            samples: list[LiveCameraSample] = []
+            with st.spinner("Opening selected cameras for controlled validation..."):
+                samples.append(capture_live_camera_sample(primary_device.index, "primary", sample_frames=int(sample_frames)))
+                if secondary_device:
+                    samples.append(capture_live_camera_sample(secondary_device.index, "secondary", sample_frames=int(sample_frames)))
+                elif "secondary" in required_roles:
+                    samples.append(
+                        LiveCameraSample(
+                            role="secondary",
+                            index=-1,
+                            connected=False,
+                            message="Secondary camera is required by the monitoring mode but no secondary device was selected.",
+                        )
+                    )
+            st.session_state[sample_key] = samples
+            if record_to_cie:
+                for sample in samples:
+                    event = live_camera_event(session_id, candidate_id, sample)
+                    save_event(event)
+                    alert = st.session_state.contextual_intelligence_engine.ingest(event)
+                    if alert:
+                        save_alert(alert)
+                    log_audit(role, "live_camera_validation_event", event.event_id, f"{event.camera_id}:{event.event_type}")
+                clear_app_caches()
+            st.success("Live dual-camera validation completed and selected devices were released.")
+
+        samples = st.session_state.get(sample_key, [])
+        if samples:
+            st.write("Live validation stream preview")
+            cols = st.columns(2)
+            for index, sample in enumerate(samples[:2]):
+                with cols[index]:
+                    title = "Primary Camera" if sample.role == "primary" else "Secondary Camera"
+                    st.markdown(f"**{title}**")
+                    st.metric("Connection status", sample.status_label)
+                    metric_cols = st.columns(2)
+                    with metric_cols[0]:
+                        st.metric("Resolution", sample.resolution_label)
+                    with metric_cols[1]:
+                        st.metric("FPS", f"{sample.fps:.1f}" if sample.connected else "0.0")
+                    if sample.connected and sample.frame_rgb is not None:
+                        st.image(sample.frame_rgb, caption=f"{title} live validation frame", width="stretch")
+                    else:
+                        st.warning(sample.message or f"{title} is unavailable.")
+        else:
+            st.caption("No live validation sample has been captured yet.")
 
 
 def visual_intelligence_panel(role: str, session_id: str, candidate_id: str) -> None:
